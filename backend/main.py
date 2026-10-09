@@ -1,26 +1,28 @@
-"""FIREBOX AI backend entry point.
-
-Run with:
-    uvicorn backend.main:app --host 0.0.0.0 --port 3000
-"""
-
+"""FIREBOX AI API with MongoDB persistence and real provider-backed answers."""
 from __future__ import annotations
 
 import hashlib
+import base64
+import hmac
 import logging
 import os
+import re
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
+import httpx
+from bson import ObjectId
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, Header, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from pymongo.errors import PyMongoError
+from pypdf import PdfReader
+from pypdf.errors import PdfReadError
 
 from .db import MongoStore, mongo_error_message
 from .model_adapter import ModelUnavailable, OllamaAdapter
@@ -31,10 +33,11 @@ ROOT = Path(__file__).resolve().parents[1]
 load_dotenv(ROOT / ".env")
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
 logger = logging.getLogger("firebox.api")
-
 store = MongoStore.from_environment()
 repositories = Repositories(store)
 model_adapter = OllamaAdapter()
+MAX_UPLOAD_BYTES = 25 * 1024 * 1024
+ALLOWED_EXTENSIONS = {".pdf", ".txt", ".md", ".csv", ".json", ".py", ".js", ".ts"}
 
 
 @asynccontextmanager
@@ -44,9 +47,30 @@ async def lifespan(_: FastAPI):
     store.close()
 
 
-app = FastAPI(title="FIREBOX AI API", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="FIREBOX AI API", version="0.2.0", lifespan=lifespan)
 origins = [item.strip() for item in os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",") if item.strip()]
-app.add_middleware(CORSMiddleware, allow_origins=origins, allow_credentials=False, allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(CORSMiddleware, allow_origins=origins, allow_credentials=False, allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"], allow_headers=["Content-Type"])
+
+
+@app.middleware("http")
+async def protect_workspace(request, call_next):
+    """Keep single-owner data private until a full identity system is added."""
+    if request.url.path == "/api/health" or request.method == "OPTIONS":
+        return await call_next(request)
+    expected_user = os.getenv("APP_USERNAME", "").strip()
+    expected_password = os.getenv("APP_PASSWORD", "")
+    if not expected_user or not expected_password:
+        return JSONResponse(status_code=503, content={"detail": "Workspace access is disabled until APP_USERNAME and APP_PASSWORD are configured on the server."})
+    auth = request.headers.get("authorization", "")
+    scheme, _, encoded = auth.partition(" ")
+    try:
+        decoded = base64.b64decode(encoded, validate=True).decode("utf-8") if scheme.lower() == "basic" else ""
+    except (ValueError, UnicodeDecodeError):
+        decoded = ""
+    supplied_user, separator, supplied_password = decoded.partition(":")
+    if not separator or not (hmac.compare_digest(supplied_user, expected_user) and hmac.compare_digest(supplied_password, expected_password)):
+        return JSONResponse(status_code=401, content={"detail": "Authentication required"}, headers={"WWW-Authenticate": 'Basic realm="FIREBOX AI", charset="UTF-8"'})
+    return await call_next(request)
 
 
 @app.exception_handler(PyMongoError)
@@ -63,15 +87,16 @@ class HealthResponse(BaseModel):
 
 
 class ChatRequest(BaseModel):
-    message: str
+    message: str = Field(min_length=1, max_length=100_000)
     model: str | None = None
     webSearch: bool = False
     conversation_id: str | None = None
+    document_ids: list[str] = Field(default_factory=list, max_length=50)
 
 
-def owner_id(header_owner: str | None) -> str:
-    """Single-user ownership boundary until authentication is added."""
-    return (header_owner or os.getenv("FIREBOX_OWNER_ID", "local-owner")).strip()[:120] or "local-owner"
+def owner_id(_: str | None = None) -> str:
+    """Single-workspace owner. Client-supplied owner IDs are deliberately ignored."""
+    return os.getenv("FIREBOX_OWNER_ID", "local-owner").strip()[:120] or "local-owner"
 
 
 def require_database() -> Repositories:
@@ -84,60 +109,154 @@ def now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def safe_storage_root() -> Path:
+    value = Path(os.getenv("STORAGE_DIR", "storage/uploads"))
+    return value if value.is_absolute() else ROOT / value
+
+
+def extract_document(path: Path, extension: str) -> list[dict[str, Any]]:
+    """Extract text with page metadata where available; fail rather than fake success."""
+    pages: list[dict[str, Any]] = []
+    if extension == ".pdf":
+        reader = PdfReader(str(path))
+        if reader.is_encrypted:
+            try:
+                if reader.decrypt("") == 0:
+                    raise ValueError("Encrypted PDFs are not supported")
+            except Exception as exc:
+                raise ValueError("Encrypted PDFs are not supported") from exc
+        for index, page in enumerate(reader.pages, start=1):
+            text = (page.extract_text() or "").strip()
+            if text:
+                pages.append({"page": index, "text": text})
+    else:
+        text = path.read_text(encoding="utf-8", errors="replace").strip()
+        if text:
+            pages.append({"page": None, "text": text})
+    if not pages:
+        raise ValueError("No extractable text was found in this document")
+    return pages
+
+
+def chunk_pages(pages: list[dict[str, Any]], size: int = 1400, overlap: int = 180) -> list[dict[str, Any]]:
+    chunks: list[dict[str, Any]] = []
+    for page in pages:
+        text = page["text"]
+        start = 0
+        while start < len(text):
+            end = min(len(text), start + size)
+            snippet = text[start:end].strip()
+            if snippet:
+                chunks.append({"text": snippet, "page": page["page"]})
+            if end >= len(text):
+                break
+            start = max(start + 1, end - overlap)
+    return chunks
+
+
+def retrieve_chunks(repo: Repositories, owner: str, query: str, document_ids: list[str]) -> list[dict[str, Any]]:
+    terms = {term for term in re.findall(r"[\w'-]{3,}", query.lower())}
+    if not terms:
+        return []
+    selector: dict[str, Any] = {"owner_id": owner}
+    if document_ids:
+        selector["document_id"] = {"$in": document_ids}
+    candidates = list(store.collection("document_chunks").find(selector).limit(2000))
+    scored = []
+    for chunk in candidates:
+        text = str(chunk.get("text", ""))
+        words = set(re.findall(r"[\w'-]{3,}", text.lower()))
+        score = len(terms & words) / max(1, len(terms))
+        if score > 0:
+            scored.append((score, chunk))
+    scored.sort(key=lambda pair: pair[0], reverse=True)
+    results = []
+    for score, chunk in scored[:5]:
+        if not ObjectId.is_valid(str(chunk.get("document_id", ""))):
+            continue
+        document = store.collection("documents").find_one({"_id": ObjectId(chunk["document_id"]), "owner_id": owner})
+        if document:
+            results.append({"type": "document", "title": document.get("filename", "Document"), "document_id": chunk["document_id"], "page": chunk.get("page"), "snippet": chunk["text"], "score": round(score, 3)})
+    return results
+
+
+async def search_web(query: str) -> list[dict[str, str]]:
+    api_key = os.getenv("TAVILY_API_KEY", "").strip()
+    if not api_key:
+        raise HTTPException(status_code=503, detail="Web search is unavailable: configure TAVILY_API_KEY on the server")
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            response = await client.post("https://api.tavily.com/search", json={"api_key": api_key, "query": query, "search_depth": "basic", "max_results": 5, "include_answer": False})
+            response.raise_for_status()
+            data = response.json()
+    except (httpx.HTTPError, ValueError) as exc:
+        logger.warning("Web search provider failed: %s", exc.__class__.__name__)
+        raise HTTPException(status_code=503, detail="The web-search provider could not complete this request") from exc
+    results = []
+    for item in data.get("results", []):
+        url = item.get("url")
+        title = item.get("title")
+        if isinstance(url, str) and url.startswith(("https://", "http://")) and isinstance(title, str):
+            results.append({"type": "web", "title": title[:300], "url": url, "snippet": str(item.get("content", ""))[:3000]})
+    if not results:
+        raise HTTPException(status_code=404, detail="The web-search provider returned no results")
+    return results
+
+
 @app.get("/api/health", response_model=HealthResponse)
 def health() -> HealthResponse:
-    storage_dir = Path(os.getenv("STORAGE_DIR", "storage/uploads"))
-    if not storage_dir.is_absolute():
-        storage_dir = ROOT / storage_dir
-    return HealthResponse(
-        status="ready" if store.connected else "degraded",
-        mongodb=store.status(),
-        storage={"available": storage_dir.exists() and storage_dir.is_dir(), "path_configured": str(storage_dir)},
-        model=model_adapter.status(),
-    )
+    storage_dir = safe_storage_root()
+    model_status = model_adapter.status()
+    ready = store.connected and bool(model_status.get("configured"))
+    return HealthResponse(status="ready" if ready else "degraded", mongodb=store.status(), storage={"available": storage_dir.exists() and storage_dir.is_dir(), "configured": bool(os.getenv("STORAGE_DIR"))}, model=model_status)
 
 
 @app.post("/api/chat")
 async def chat(payload: ChatRequest, x_owner_id: str | None = Header(default=None)) -> dict[str, Any]:
-    """Generate from a configured model using persisted conversation context.
-
-    Persistence is handled by the conversation/message endpoints so a model failure
-    cannot be mistaken for a successful database write.
-    """
     repo = require_database()
     prompt = payload.message.strip()
     if not prompt:
         raise HTTPException(status_code=422, detail="Message cannot be empty")
-
+    owner = owner_id(x_owner_id)
     context: list[dict[str, str]] = []
     if payload.conversation_id:
-        conversation = repo.get_conversation(owner_id(x_owner_id), payload.conversation_id)
-        if conversation is not None:
-            context = [
-                {"role": item["role"], "content": item["content"]}
-                for item in conversation.get("messages", [])[-20:]
-                if item.get("role") in {"user", "assistant", "system"} and item.get("content")
-            ]
-    context.append({"role": "user", "content": prompt})
+        conversation = repo.get_conversation(owner, payload.conversation_id)
+        if conversation is None:
+            raise HTTPException(status_code=404, detail="Conversation not found")
+        history = conversation.get("messages", [])[-20:]
+        context = [{"role": m["role"], "content": m["content"]} for m in history if m.get("role") in {"user", "assistant", "system"} and m.get("content")]
+        if not context or context[-1]["role"] != "user" or context[-1]["content"] != prompt:
+            context.append({"role": "user", "content": prompt})
+    else:
+        context = [{"role": "user", "content": prompt}]
 
+    sources: list[dict[str, Any]] = []
     try:
+        sources.extend(retrieve_chunks(repo, owner, prompt, payload.document_ids))
+        if payload.webSearch:
+            sources.extend(await search_web(prompt))
+        if sources:
+            blocks = []
+            for index, source in enumerate(sources, start=1):
+                label = f"[S{index}] {source['title']}" + (f", page {source['page']}" if source.get("page") else "")
+                blocks.append(f"{label}\n{source['snippet']}")
+            evidence = "\n\n".join(blocks)
+            context.insert(0, {"role": "system", "content": "Use the supplied evidence when relevant. Cite evidence inline with its [S#] label. Do not claim facts not supported by the context.\n\nEvidence:\n" + evidence})
         answer = await model_adapter.chat(context, payload.model)
     except ModelUnavailable as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
-    return {"answer": answer, "conversation_id": payload.conversation_id, "model": payload.model or model_adapter.model_name, "web_search_requested": payload.webSearch, "source": "model"}
+    return {"answer": answer, "conversation_id": payload.conversation_id, "model": payload.model or model_adapter.model_name, "sources": sources}
 
 
 @app.get("/api/conversations")
 def list_conversations(x_owner_id: str | None = Header(default=None)) -> dict[str, Any]:
-    repo = require_database()
-    return {"items": repo.list_conversations(owner_id(x_owner_id))}
+    return {"items": require_database().list_conversations(owner_id(x_owner_id))}
 
 
 @app.post("/api/conversations", status_code=201)
 def create_conversation(payload: ConversationCreate, x_owner_id: str | None = Header(default=None)) -> dict[str, Any]:
-    repo = require_database()
     try:
-        return repo.create_conversation(owner_id(x_owner_id), payload.title)
+        return require_database().create_conversation(owner_id(x_owner_id), payload.title)
     except Exception as exc:
         logger.exception("Conversation creation failed")
         raise HTTPException(status_code=503, detail=mongo_error_message(exc)) from exc
@@ -145,18 +264,24 @@ def create_conversation(payload: ConversationCreate, x_owner_id: str | None = He
 
 @app.get("/api/conversations/{conversation_id}")
 def get_conversation(conversation_id: str, x_owner_id: str | None = Header(default=None)) -> dict[str, Any]:
-    repo = require_database()
-    conversation = repo.get_conversation(owner_id(x_owner_id), conversation_id)
+    conversation = require_database().get_conversation(owner_id(x_owner_id), conversation_id)
     if conversation is None:
         raise HTTPException(status_code=404, detail="Conversation not found")
     return conversation
 
 
+@app.patch("/api/conversations/{conversation_id}")
+def rename_conversation(conversation_id: str, payload: ConversationCreate, x_owner_id: str | None = Header(default=None)) -> dict[str, Any]:
+    result = require_database().rename_conversation(owner_id(x_owner_id), conversation_id, payload.title)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    return result
+
+
 @app.post("/api/conversations/{conversation_id}/messages", status_code=201)
 def add_message(conversation_id: str, payload: MessageCreate, x_owner_id: str | None = Header(default=None)) -> dict[str, Any]:
-    repo = require_database()
     try:
-        message = repo.append_message(owner_id(x_owner_id), conversation_id, payload.role, payload.content, payload.metadata)
+        message = require_database().append_message(owner_id(x_owner_id), conversation_id, payload.role, payload.content, payload.metadata)
     except Exception as exc:
         logger.exception("Message persistence failed")
         raise HTTPException(status_code=503, detail=mongo_error_message(exc)) from exc
@@ -167,29 +292,20 @@ def add_message(conversation_id: str, payload: MessageCreate, x_owner_id: str | 
 
 @app.delete("/api/conversations/{conversation_id}")
 def delete_conversation(conversation_id: str, x_owner_id: str | None = Header(default=None)) -> dict[str, Any]:
-    repo = require_database()
-    try:
-        deleted = repo.delete_conversation(owner_id(x_owner_id), conversation_id)
-    except Exception as exc:
-        logger.exception("Conversation deletion failed")
-        raise HTTPException(status_code=503, detail=mongo_error_message(exc)) from exc
-    if not deleted:
+    if not require_database().delete_conversation(owner_id(x_owner_id), conversation_id):
         raise HTTPException(status_code=404, detail="Conversation not found")
     return {"deleted": True, "conversation_id": conversation_id}
 
 
 @app.get("/api/settings")
 def get_settings(x_owner_id: str | None = Header(default=None)) -> dict[str, Any]:
-    repo = require_database()
-    return repo.get_settings(owner_id(x_owner_id))
+    return require_database().get_settings(owner_id(x_owner_id))
 
 
 @app.patch("/api/settings")
 def update_settings(payload: SettingsUpdate, x_owner_id: str | None = Header(default=None)) -> dict[str, Any]:
-    repo = require_database()
-    values = payload.model_dump(exclude_none=True)
     try:
-        return repo.update_settings(owner_id(x_owner_id), values)
+        return require_database().update_settings(owner_id(x_owner_id), payload.model_dump(exclude_none=True))
     except Exception as exc:
         logger.exception("Settings update failed")
         raise HTTPException(status_code=503, detail=mongo_error_message(exc)) from exc
@@ -197,8 +313,7 @@ def update_settings(payload: SettingsUpdate, x_owner_id: str | None = Header(def
 
 @app.get("/api/documents")
 def list_documents(x_owner_id: str | None = Header(default=None)) -> dict[str, Any]:
-    repo = require_database()
-    return {"items": repo.list_documents(owner_id(x_owner_id))}
+    return {"items": require_database().list_documents(owner_id(x_owner_id))}
 
 
 @app.post("/api/documents/upload", status_code=201)
@@ -206,50 +321,53 @@ async def upload_document(file: UploadFile = File(...), x_owner_id: str | None =
     repo = require_database()
     if not file.filename:
         raise HTTPException(status_code=400, detail="A filename is required")
-    allowed_extensions = {".pdf", ".txt", ".md", ".csv", ".json", ".py", ".js", ".ts"}
     filename = Path(file.filename).name
-    if Path(filename).suffix.lower() not in allowed_extensions:
+    extension = Path(filename).suffix.lower()
+    if extension not in ALLOWED_EXTENSIONS:
         raise HTTPException(status_code=415, detail="Unsupported document type")
-
     owner = owner_id(x_owner_id)
-    base_dir = Path(os.getenv("STORAGE_DIR", "storage/uploads"))
-    if not base_dir.is_absolute():
-        base_dir = ROOT / base_dir
-    owner_dir = base_dir / owner.replace("/", "_")
+    safe_owner = re.sub(r"[^A-Za-z0-9_.-]", "_", owner)[:120]
+    owner_dir = safe_storage_root() / safe_owner
     owner_dir.mkdir(parents=True, exist_ok=True)
-    storage_path = owner_dir / f"{uuid4().hex}_{filename}"
+    path = owner_dir / f"{uuid4().hex}_{filename}"
     digest = hashlib.sha256()
     size = 0
-    max_bytes = 25 * 1024 * 1024
-
+    document: dict[str, Any] | None = None
     try:
-        with storage_path.open("wb") as output:
+        with path.open("wb") as output:
             while chunk := await file.read(1024 * 1024):
                 size += len(chunk)
-                if size > max_bytes:
+                if size > MAX_UPLOAD_BYTES:
                     raise HTTPException(status_code=413, detail="Documents must be 25 MB or smaller")
                 digest.update(chunk)
                 output.write(chunk)
-
-        document = repo.insert_document({
-            "owner_id": owner,
-            "filename": filename,
-            "content_type": file.content_type or "application/octet-stream",
-            "size_bytes": size,
-            "sha256": digest.hexdigest(),
-            "storage_key": str(storage_path.relative_to(ROOT)),
-            "status": "uploaded",
-            "processing_status": "pending",
-            "created_at": now(),
-            "updated_at": now(),
-        })
+        if extension == ".pdf" and not path.read_bytes()[:5] == b"%PDF-":
+            raise HTTPException(status_code=415, detail="The uploaded file is not a valid PDF")
+        extracted = extract_document(path, extension)
+        chunks = chunk_pages(extracted)
+        document = repo.insert_document({"owner_id": owner, "filename": filename, "content_type": file.content_type or "application/octet-stream", "size_bytes": size, "sha256": digest.hexdigest(), "storage_key": str(path.resolve()), "status": "processing", "processing_status": "processing", "chunk_count": 0, "created_at": now(), "updated_at": now()})
+        for index, chunk in enumerate(chunks):
+            store.collection("document_chunks").insert_one({"owner_id": owner, "document_id": document["id"], "chunk_index": index, "page": chunk["page"], "text": chunk["text"], "created_at": now()})
+        result = store.collection("documents").update_one({"_id": ObjectId(document["id"]), "owner_id": owner}, {"$set": {"status": "completed", "processing_status": "completed", "chunk_count": len(chunks), "updated_at": now()}})
+        if result.matched_count != 1:
+            raise RuntimeError("Document record disappeared before indexing completed")
+        document.update({"status": "completed", "processing_status": "completed", "chunk_count": len(chunks)})
+        document.pop("storage_key", None)
         return document
     except HTTPException:
-        storage_path.unlink(missing_ok=True)
+        path.unlink(missing_ok=True)
         raise
+    except (ValueError, OSError, PdfReadError) as exc:
+        path.unlink(missing_ok=True)
+        raise HTTPException(status_code=422, detail=f"Document processing failed: {exc}") from exc
     except Exception as exc:
-        storage_path.unlink(missing_ok=True)
-        logger.exception("Document metadata persistence failed")
+        path.unlink(missing_ok=True)
+        if document is not None:
+            try:
+                repo.delete_document(owner, document["id"])
+            except Exception:
+                logger.exception("Could not remove a partially indexed document")
+        logger.exception("Document processing or persistence failed")
         raise HTTPException(status_code=503, detail=mongo_error_message(exc)) from exc
     finally:
         await file.close()
@@ -262,9 +380,10 @@ def delete_document(document_id: str, x_owner_id: str | None = Header(default=No
         document = repo.delete_document(owner_id(x_owner_id), document_id)
         if document is None:
             raise HTTPException(status_code=404, detail="Document not found")
-        storage_path = ROOT / str(document.get("storage_key", ""))
-        if storage_path.is_file() and ROOT in storage_path.parents:
-            storage_path.unlink(missing_ok=True)
+        storage_value = Path(str(document.get("storage_key", "")))
+        path = storage_value if storage_value.is_absolute() else ROOT / storage_value
+        if path.is_file() and (ROOT in path.parents or safe_storage_root() in path.parents):
+            path.unlink(missing_ok=True)
         return {"deleted": True, "document_id": document_id}
     except HTTPException:
         raise
@@ -278,7 +397,6 @@ def api_index() -> dict[str, Any]:
     return {"name": "FIREBOX AI API", "version": app.version, "docs": "/docs"}
 
 
-# Safe static serving: frontend files only, never dotfiles, .env, backend code, or storage.
 PUBLIC_FILES = {"index.html", "styles.css", "app.js", "firebox-ai-icon.svg", "manus-routes.json"}
 
 
@@ -289,8 +407,6 @@ def frontend(path: str = ""):
         return FileResponse(ROOT / "index.html")
     if clean_path in PUBLIC_FILES:
         return FileResponse(ROOT / clean_path)
-    if clean_path.startswith("public/"):
-        relative = clean_path.removeprefix("public/")
-        if relative in {"firebox-ai-icon.svg", "manus-routes.json"}:
-            return FileResponse(ROOT / "public" / relative)
+    if clean_path.startswith("public/") and clean_path.removeprefix("public/") in {"firebox-ai-icon.svg", "manus-routes.json"}:
+        return FileResponse(ROOT / "public" / clean_path.removeprefix("public/"))
     return FileResponse(ROOT / "index.html")

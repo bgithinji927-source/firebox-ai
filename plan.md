@@ -2,19 +2,20 @@
 
 ## Product scope
 
-Create a responsive, browser-based FIREBOX AI application with a ChatGPT-style dark dashboard, a Python/FastAPI backend, and MongoDB as the primary application database. The frontend remains usable while model services are offline, but backend storage and health reporting are real and never claim success when a save fails.
+Maintain a responsive FIREBOX AI workspace with a Python/FastAPI backend and MongoDB as the primary application database. Model, storage, search, and auth status must be represented honestly; unavailable services must not produce fabricated answers or successful-save messages.
 
 ## Implementation approach
 
 - Use semantic HTML, plain CSS, and vanilla JavaScript so a beginner can read and maintain the project without a build framework.
-- Use FastAPI and Pydantic for the API, PyMongo for MongoDB access, and a small Ollama-compatible model adapter for live local inference.
+- Use FastAPI and Pydantic for the API, PyMongo for MongoDB access, and configurable OpenAI-compatible or Ollama-compatible model adapters.
 - Keep MongoDB collections and persistence operations in `backend/repositories.py`; keep connection and index management in `backend/db.py`.
-- Store original uploads in configured file storage and keep document metadata, checksums, processing status, and future chunk metadata in MongoDB.
-- Keep the app as a static web project served on port 3000.
+- Store original uploads in configured file storage and persist document metadata, extracted chunks, and processing status in MongoDB.
+- Serve the frontend and API from one Railway-compatible container using the assigned `PORT`.
 - Put the reusable brand icon in `public/firebox-ai-icon.svg`.
 - Keep the route manifest at `public/manus-routes.json`.
-- Use `app.js` for UI state: conversation switching, composing/sending messages, preview responses, file-chip handling, model/search controls, copy buttons, regenerate, stop generation, and mobile sidebar behavior.
-- Preserve future integration seams with a single `API_BASE_URL` constant and explicit `/api/chat`, conversation, settings, and document endpoints; when MongoDB or the model is unavailable, the API returns an honest error and the UI reports that state.
+- Use `app.js` for UI state: persisted conversation switching, composing/sending messages, file processing, model/search settings, citations, regeneration, best-effort cancellation, and mobile sidebar behavior.
+- Keep explicit `/api/chat`, conversation, settings, and document endpoints; when MongoDB or a provider is unavailable, return a meaningful error rather than fabricated output.
+- Protect the single-workspace app with server-side credentials; never trust client-supplied owner IDs.
 
 ## Design direction
 
@@ -26,7 +27,7 @@ Monochrome neo-industrial editorial: a quiet, high-contrast interface that combi
 
 1. **Signal over decoration** — every control earns its place and the hierarchy is readable at a glance.
 2. **Hard contrast, soft rhythm** — black and white create authority while spacing, rounded corners, and subtle transitions keep the experience calm.
-3. **Visible system state** — model, search, preview mode, files, citations, and generation status are surfaced instead of hidden.
+3. **Visible system state** — model, search, files, citations, and generation status are surfaced instead of hidden.
 4. **Built for focus** — the chat workspace is the visual center; secondary tools stay in the rail or compact utility bar.
 
 ### Color philosophy
@@ -45,7 +46,7 @@ Use a left command rail plus an offset main workspace. The sidebar is a persiste
 
 ### Interaction philosophy
 
-Interactions are direct and reversible. Buttons show clear hover/focus states, toggles expose their state in text, file selection is represented as a removable chip, and destructive actions require an explicit second step only where needed. The preview fallback is honest and visible.
+Interactions are direct and reversible. Buttons show clear hover/focus states, toggles expose their state in text, file selection is represented as a removable chip, and destructive actions require an explicit second step only where needed. Missing features are identified instead of simulated.
 
 ### Animation
 
@@ -79,13 +80,16 @@ The ownable brand color for this requested version is **ink black** (`#050505`) 
 ## Project structure
 
 ```text
-fireboxai/
+firebox-ai/
+├── backend/                    # FastAPI, MongoDB, model and document integrations
 ├── index.html                 # semantic application shell
 ├── styles.css                 # monochrome design system and responsive layout
 ├── app.js                     # client-side state and interactions
 ├── app.config.ts              # project logo metadata
 ├── plan.md                    # this implementation and design plan
 ├── TODO.md                    # deliverable outcomes and acceptance clauses
+├── Dockerfile                 # production container
+├── railway.json               # Railway deployment settings
 └── public/
     ├── firebox-ai-icon.svg    # reusable brand mark
     └── manus-routes.json       # route manifest for the web preview

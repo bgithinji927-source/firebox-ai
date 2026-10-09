@@ -31,12 +31,12 @@
             <span class="nav-icon" aria-hidden="true">⌁</span>
             <span>Assistant</span>
           </a>
-          <a class="nav-item" href="#library" data-toast="Knowledge library is ready for document indexing.">
+          <a class="nav-item" href="#chat" data-toast="The standalone library view is unavailable; attach a document to process and retrieve it.">
             <span class="nav-icon" aria-hidden="true">▤</span>
             <span>Knowledge library</span>
-            <span class="nav-count">03</span>
+            <span class="nav-count" id="documentCount">0</span>
           </a>
-          <a class="nav-item" href="#activity" data-toast="Activity history will appear here as you work.">
+          <a class="nav-item" href="#chat" data-toast="A separate activity feed is not implemented.">
             <span class="nav-icon" aria-hidden="true">◷</span>
             <span>Activity</span>
           </a>
@@ -44,30 +44,10 @@
 
         <div class="sidebar-section-heading">
           <span>Recent conversations</span>
-          <button class="icon-button small" type="button" aria-label="Conversation options" data-toast="Conversation options are available in the full app.">•••</button>
+          <button class="icon-button small" type="button" aria-label="Conversation options" data-toast="Use the Delete conversation action to remove the active conversation.">•••</button>
         </div>
         <div class="conversation-list" id="conversationList">
-          <button class="conversation-item is-active" type="button" data-conversation="API authentication patterns">
-            <span class="conversation-dot"></span>
-            <span class="conversation-item-copy">
-              <strong>API authentication patterns</strong>
-              <small>Today · 10:42</small>
-            </span>
-          </button>
-          <button class="conversation-item" type="button" data-conversation="Threat modeling a small API">
-            <span class="conversation-dot"></span>
-            <span class="conversation-item-copy">
-              <strong>Threat modeling a small API</strong>
-              <small>Yesterday · 18:09</small>
-            </span>
-          </button>
-          <button class="conversation-item" type="button" data-conversation="Python async fundamentals">
-            <span class="conversation-dot"></span>
-            <span class="conversation-item-copy">
-              <strong>Python async fundamentals</strong>
-              <small>Oct 08 · 13:26</small>
-            </span>
-          </button>
+          <p class="empty-conversations">Loading saved conversations…</p>
         </div>
 
         <div class="sidebar-footer">
@@ -75,7 +55,7 @@
             <span class="status-led"></span>
             <span><strong>Connecting to backend</strong><small>Checking MongoDB persistence</small></span>
           </div>
-          <button class="profile-row" type="button" data-toast="Profile settings are coming with authentication.">
+          <button class="profile-row" type="button" data-toast="Account management is not available; access uses the server-configured workspace credentials.">
             <span class="avatar">FT</span>
             <span class="profile-copy"><strong>FireboxTechs</strong><small>Workspace owner</small></span>
             <span class="profile-more">•••</span>
@@ -90,7 +70,7 @@
           <div class="topbar-left">
             <button class="icon-button menu-button" id="menuButton" type="button" aria-label="Open navigation">☰</button>
             <div class="workspace-context">
-              <span class="eyebrow">WORKSPACE / 01</span>
+              <span class="eyebrow">FIREBOX AI WORKSPACE</span>
               <h1>Technical assistant</h1>
             </div>
           </div>
@@ -98,9 +78,7 @@
             <label class="model-control" for="modelSelect">
               <span class="model-led"></span>
               <select id="modelSelect" aria-label="Select model">
-                <option>Firebox Small · Local</option>
-                <option>Qwen 2.5 Coder · Local</option>
-                <option>Llama 3.2 · Local</option>
+                <option value="">Server-configured model</option>
               </select>
             </label>
             <button class="search-toggle" id="searchToggle" type="button" aria-pressed="false">
@@ -117,32 +95,18 @@
             <div class="conversation-header">
               <div>
                 <span class="eyebrow">ACTIVE CONVERSATION</span>
-                <h2 id="conversationTitle">API authentication patterns</h2>
+                <h2 id="conversationTitle">New conversation</h2>
               </div>
               <div class="conversation-actions">
                 <button class="ghost-button" id="regenerateButton" type="button" disabled>
                   <span aria-hidden="true">↻</span> Regenerate
                 </button>
-                <button class="icon-button" type="button" aria-label="More conversation options" data-toast="Conversation actions are available in the full app.">•••</button>
+                <button class="ghost-button" id="renameConversationButton" type="button">Rename</button>
+                <button class="icon-button" id="deleteConversationButton" type="button" aria-label="Delete conversation" title="Delete conversation">⌫</button>
               </div>
             </div>
 
             <div class="chat-scroll" id="chatScroll">
-              <div class="message-group assistant-group">
-                <div class="message-meta">
-                  <span class="message-avatar"><img src="/firebox-ai-icon.svg" alt="" /></span>
-                  <span>FIREBOX AI</span>
-                  <span class="message-time">10:42</span>
-                  <span class="source-label">LOCAL MODEL</span>
-                </div>
-                <article class="message-card assistant-message">
-                  <p>Let’s make the next technical decision clearer. I can help you reason through architecture, debug code, or turn dense documentation into a practical plan.</p>
-                  <p>What are you building today?</p>
-                  <div class="response-divider"></div>
-                  <div class="message-note"><span class="note-mark">i</span> Preview response · Connect a model endpoint to enable live generation.</div>
-                </article>
-              </div>
-
               <div class="quick-prompts" id="quickPrompts" aria-label="Suggested prompts">
                 <button class="prompt-card" type="button" data-prompt="Explain JWT authentication like I am new to backend development.">
                   <span class="prompt-index">01</span>
@@ -159,11 +123,6 @@
                   <strong>Write practical code</strong>
                   <span>Generate a focused example with explanations.</span>
                 </button>
-              </div>
-
-              <div class="message-group user-group is-hidden" id="seedUserMessage">
-                <div class="message-meta user-meta"><span>You</span><span class="message-time">now</span></div>
-                <article class="message-card user-message" id="seedUserContent"></article>
               </div>
 
               <div class="typing-row is-hidden" id="typingRow" aria-live="polite">
@@ -201,22 +160,22 @@
 
           <aside class="utility-rail" aria-label="Assistant context">
             <section class="utility-card status-card">
-              <div class="utility-card-heading"><span class="eyebrow">SYSTEM STATUS</span><span class="live-chip"><span></span> LIVE UI</span></div>
-              <div class="status-line"><span class="status-check">✓</span><span><strong>Workspace ready</strong><small>Local interface is operational</small></span></div>
-              <div class="status-line"><span class="status-check">✓</span><span><strong>Conversation memory</strong><small>Session state enabled</small></span></div>
-              <div class="status-line status-line-muted"><span class="status-pending">—</span><span><strong>Model endpoint</strong><small>Connect `/api/chat` to activate</small></span></div>
+              <div class="utility-card-heading"><span class="eyebrow">SERVICE STATUS</span><span class="live-chip" id="serviceChip"><span></span> CHECKING</span></div>
+              <div class="status-line status-line-muted"><span class="status-pending">—</span><span><strong id="databaseStatus">Database</strong><small id="databaseDetail">Waiting for backend health check</small></span></div>
+              <div class="status-line status-line-muted"><span class="status-pending">—</span><span><strong id="memoryStatus">Conversation memory</strong><small id="memoryDetail">Requires MongoDB connection</small></span></div>
+              <div class="status-line status-line-muted"><span class="status-pending">—</span><span><strong id="modelStatus">Model endpoint</strong><small id="modelDetail">Requires server-side model configuration</small></span></div>
             </section>
 
             <section class="utility-card source-card">
               <div class="utility-card-heading"><span class="eyebrow">SOURCE LAYERS</span><button class="icon-button small" type="button" aria-label="Source layer information" data-toast="Source layers keep model, document, and web context distinct.">i</button></div>
-              <div class="source-layer is-active"><span class="layer-symbol">M</span><div><strong>Model knowledge</strong><small>Available in preview</small></div><span class="layer-state"></span></div>
-              <div class="source-layer"><span class="layer-symbol">D</span><div><strong>Documents</strong><small>Attach a file to index</small></div><span class="layer-state is-off"></span></div>
-              <div class="source-layer"><span class="layer-symbol">W</span><div><strong>Web research</strong><small>Turn on web search above</small></div><span class="layer-state is-off"></span></div>
+              <div class="source-layer"><span class="layer-symbol">M</span><div><strong>Language model</strong><small>Server-configured provider</small></div><span class="layer-state is-off"></span></div>
+              <div class="source-layer"><span class="layer-symbol">D</span><div><strong>Documents</strong><small>PDF/text extraction and retrieval</small></div><span class="layer-state is-off"></span></div>
+              <div class="source-layer"><span class="layer-symbol">W</span><div><strong>Web research</strong><small>Requires a configured search key</small></div><span class="layer-state is-off"></span></div>
             </section>
 
             <section class="utility-card recent-card">
-              <div class="utility-card-heading"><span class="eyebrow">RECENT SOURCES</span><span class="source-count">00</span></div>
-              <div class="empty-source"><span class="empty-source-mark">⌁</span><strong>No sources yet</strong><small>Ask a question to see citations here.</small></div>
+              <div class="utility-card-heading"><span class="eyebrow">RECENT SOURCES</span><span class="source-count" id="sourceCount">0</span></div>
+              <div id="recentSources" class="empty-source"><span class="empty-source-mark">⌁</span><strong>No sources yet</strong><small>Sources from completed answers appear here.</small></div>
             </section>
 
             <div class="utility-tip"><span class="tip-mark">/</span><p><strong>Build with signal.</strong><br />Attach a source when precision matters.</p></div>

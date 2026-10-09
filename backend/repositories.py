@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from datetime import datetime, timezone
 from typing import Any
 
@@ -39,7 +40,12 @@ class Repositories:
 
     def list_conversations(self, owner_id: str) -> list[dict[str, Any]]:
         cursor = self.store.collection("conversations").find({"owner_id": owner_id}).sort("updated_at", -1).limit(100)
-        return [serialise(item) for item in cursor]
+        results = []
+        for item in cursor:
+            response = serialise(item)
+            response["id"] = str(item["_id"])
+            results.append(response)
+        return results
 
     def get_conversation(self, owner_id: str, conversation_id: str) -> dict[str, Any] | None:
         if not ObjectId.is_valid(conversation_id):
@@ -51,6 +57,20 @@ class Repositories:
         response = serialise(conversation)
         response["id"] = conversation_id
         response["messages"] = [serialise(message) for message in messages]
+        return response
+
+    def rename_conversation(self, owner_id: str, conversation_id: str, title: str) -> dict[str, Any] | None:
+        if not ObjectId.is_valid(conversation_id):
+            return None
+        result = self.store.collection("conversations").find_one_and_update(
+            {"_id": ObjectId(conversation_id), "owner_id": owner_id},
+            {"$set": {"title": title.strip()[:160] or "New conversation", "updated_at": utc_now()}},
+            return_document=True,
+        )
+        if result is None:
+            return None
+        response = serialise(result)
+        response["id"] = conversation_id
         return response
 
     def append_message(self, owner_id: str, conversation_id: str, role: str, content: str, metadata: dict[str, Any] | None = None) -> dict[str, Any] | None:
@@ -78,7 +98,7 @@ class Repositories:
 
     def get_settings(self, owner_id: str) -> dict[str, Any]:
         item = self.store.collection("settings").find_one({"owner_id": owner_id})
-        return serialise(item or {"owner_id": owner_id, "model_name": "Firebox Small · Local", "web_search_enabled": False})
+        return serialise(item or {"owner_id": owner_id, "model_name": os.getenv("MODEL_NAME", ""), "web_search_enabled": False})
 
     def update_settings(self, owner_id: str, values: dict[str, Any]) -> dict[str, Any]:
         allowed = {key: value for key, value in values.items() if key in {"model_name", "web_search_enabled"}}
@@ -94,7 +114,13 @@ class Repositories:
 
     def list_documents(self, owner_id: str) -> list[dict[str, Any]]:
         cursor = self.store.collection("documents").find({"owner_id": owner_id}).sort("created_at", -1)
-        return [serialise(item) for item in cursor]
+        results = []
+        for item in cursor:
+            response = serialise(item)
+            response["id"] = str(item["_id"])
+            response.pop("storage_key", None)
+            results.append(response)
+        return results
 
     def delete_document(self, owner_id: str, document_id: str) -> dict[str, Any] | None:
         if not ObjectId.is_valid(document_id):

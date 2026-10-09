@@ -347,3 +347,10 @@ html, body { background: #212121; color: #f5f5f5; }
 
 /* Keep the chat header visually continuous with the dark workspace. */
 .conversation-header { background: transparent; }
+
+.empty-conversations { margin: 8px 10px; color: #777; font-size: 11px; line-height: 1.45; }
+.conversation-actions { flex-wrap: wrap; }
+.conversation-actions .ghost-button { white-space: nowrap; }
+.recent-source-list { display: grid; gap: 7px; }
+.recent-source-item { display: block; overflow-wrap: anywhere; padding: 8px 9px; border: 1px solid var(--line); border-radius: 7px; color: #5d5d5d; font-size: 10px; line-height: 1.4; }
+a.recent-source-item:hover { color: var(--ink); border-color: var(--ink); }

@@ -1,12 +1,34 @@
-# FIREBOX AI Dashboard — Outcomes
+# FIREBOX AI — implementation status
 
-- [x] Deliver a complete responsive FIREBOX AI dashboard with a clean chat interface, collapsible conversation sidebar, conversation history, new-chat action, multiline composer, file uploads, web-search control, model selection, markdown-style responses, syntax-highlighted code blocks, copy buttons, source citations, loading indicators, clear error states, stop-generation control, regenerate action, and desktop/mobile layouts.
-- [x] Use the supplied FIREBOX AI icon and apply a black-and-white/grayscale-only visual system across backgrounds, text, borders, controls, icons, states, and typography without purple or other colored accents.
-- [x] Make the frontend demonstrably interactive: switch conversations, create new chats, toggle web search, change models, select/remove files, submit a message, show generation state, stop generation, regenerate the last response, copy code, and open source citations.
-- [x] Keep the preview honest and maintainable by showing the backend connection state, preserving a clear `/api/chat` integration seam, and avoiding claims that a live model request or database save succeeded when it did not.
-- [x] Provide a route manifest and project metadata so the managed web preview can serve and identify the dashboard correctly.
-- [x] Use MongoDB as the primary application database for conversations, messages, settings, document metadata, document chunks, and processing state; do not use SQLite or PostgreSQL.
-- [x] Keep MongoDB credentials in protected backend environment variables, include `.env.example`, and never expose connection strings in frontend code.
-- [x] Add graceful MongoDB failure handling so failed operations return errors and the UI does not claim that data was saved.
-- [x] Add a FastAPI/PyMongo backend with ownership fields, timestamps, indexes, conversation/message CRUD, settings persistence, document metadata upload/delete, and a configurable Ollama-compatible model boundary.
-- [ ] Add document text extraction, chunking, embeddings, MongoDB Atlas Vector Search support, and a compatible local retrieval fallback.
+## Implemented in the current codebase
+
+- [x] Preserve the existing FIREBOX AI responsive monochrome interface and branding.
+- [x] Remove scripted local chat answers and seeded conversation history; model failures are explicit.
+- [x] Connect chat to configurable OpenAI-compatible and Ollama-compatible APIs, with recent persisted conversation context.
+- [x] Persist conversations, messages, settings, document metadata, and extracted chunks in MongoDB.
+- [x] Support conversation listing, loading, renaming, and deletion from the UI/API.
+- [x] Add server-side single-workspace Basic Authentication and ignore client-supplied owner IDs.
+- [x] Validate and process supported PDFs/text files with text extraction, chunking, MongoDB indexing, retrieval, and document/page citations.
+- [x] Connect optional real web search through Tavily and return source titles and URLs; report missing keys and provider errors honestly.
+- [x] Implement actual model selection/search settings persistence, attachment processing, and best-effort request cancellation.
+- [x] Add Railway Dockerfile selection and a public health-check route; configure durable uploads via a Railway Volume.
+- [x] Add unit tests for text extraction, page-aware chunking, owner-header rejection, and HTTP Basic Auth.
+
+## Required before a useful Railway deployment
+
+- [ ] Configure `MONGODB_URI` and verify real MongoDB connectivity/persistence.
+- [ ] Configure `APP_USERNAME` and a strong `APP_PASSWORD` before exposing a public domain.
+- [ ] Configure `MODEL_PROVIDER`, `MODEL_BASE_URL`, `MODEL_NAME`, and (for OpenAI-compatible services) `MODEL_API_KEY`; test real generation.
+- [ ] Configure `TAVILY_API_KEY` if web search is required and verify real source retrieval.
+- [ ] Attach a Railway Volume at `/app/storage` and verify uploaded originals survive a restart.
+- [ ] Run end-to-end integration checks against the actual Railway services.
+
+## Remaining work / limitations
+
+- [ ] Implement per-user accounts and authorization; this version is intentionally single-workspace behind one Basic Auth credential.
+- [ ] Add streaming output and provider-level cancellation where supported; current stop action aborts the in-flight request on a best-effort basis.
+- [ ] Add semantic embeddings/vector search; current document retrieval is lexical keyword scoring.
+- [ ] Add robust document deletion/list management controls and a standalone knowledge-library view.
+- [ ] Add rate limiting, audit logging, observability, backup/restore, and a formal security review.
+
+No external database, model, or search integration has been declared verified unless that integration was actually tested with its credentials.
