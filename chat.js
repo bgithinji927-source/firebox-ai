@@ -47,6 +47,7 @@ function inlineMarkdown(text) {
   html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
   html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
   html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  html = html.replace(/\*([^*]+)\*/g, '<em>$1</em>');
   return html;
 }
 
@@ -103,7 +104,12 @@ function renderMarkdown(source) {
     const number = line.match(/^\s*\d+[.)]\s+(.+)/);
     if (heading) { flushParagraph(); flushList(); const level = Math.min(3, line.match(/^#+/)[0].length); output.push(`<h${level}>${inlineMarkdown(heading[1])}</h${level}>`); continue; }
     if (bullet || number) { if (number && !ordered) { flushList(); ordered = true; } if (bullet && ordered) flushList(); list.push((bullet || number)[1]); continue; }
-    if (!line.trim()) { flushParagraph(); flushList(); continue; }
+    if (!line.trim()) {
+      flushParagraph();
+      const nextLine = lines[index + 1] || '';
+      if (!/^\s*(?:[-*]|\d+[.)])\s+/.test(nextLine)) flushList();
+      continue;
+    }
     paragraph.push(line.trim());
   }
   if (code) output.push(`<div class="code-card"><div class="code-card-head"><span>${escapeHtml(code.language || 'code')}</span></div><pre><code>${highlightCode(code.text, code.language)}</code></pre></div>`);
