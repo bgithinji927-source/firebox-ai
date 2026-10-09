@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#050505" />
+    <meta name="description" content="FIREBOX AI — a focused technical AI workspace for builders." />
+    <title>FIREBOX AI — Technical Assistant</title>
+    <link rel="icon" type="image/svg+xml" href="/firebox-ai-icon.svg" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" id="sidebar" aria-label="Conversation navigation">
+        <div class="brand-block">
+          <img class="brand-mark" src="/firebox-ai-icon.svg" alt="FIREBOX AI" />
+          <div class="brand-copy">
+            <span class="brand-name">FIREBOX</span>
+            <span class="brand-meta">AI / TECHNICAL ASSISTANT</span>
+          </div>
+        </div>
+
+        <button class="new-chat-button" id="newChatButton" type="button">
+          <span class="button-icon" aria-hidden="true">+</span>
+          <span>New conversation</span>
+          <kbd>⌘ K</kbd>
+        </button>
+
+        <nav class="primary-nav" aria-label="Primary">
+          <a class="nav-item is-active" href="#chat" aria-current="page">
+            <span class="nav-icon" aria-hidden="true">⌁</span>
+            <span>Assistant</span>
+          </a>
+          <a class="nav-item" href="#library" data-toast="Knowledge library is ready for document indexing.">
+            <span class="nav-icon" aria-hidden="true">▤</span>
+            <span>Knowledge library</span>
+            <span class="nav-count">03</span>
+          </a>
+          <a class="nav-item" href="#activity" data-toast="Activity history will appear here as you work.">
+            <span class="nav-icon" aria-hidden="true">◷</span>
+            <span>Activity</span>
+          </a>
+        </nav>
+
+        <div class="sidebar-section-heading">
+          <span>Recent conversations</span>
+          <button class="icon-button small" type="button" aria-label="Conversation options" data-toast="Conversation options are available in the full app.">•••</button>
+        </div>
+        <div class="conversation-list" id="conversationList">
+          <button class="conversation-item is-active" type="button" data-conversation="API authentication patterns">
+            <span class="conversation-dot"></span>
+            <span class="conversation-item-copy">
+              <strong>API authentication patterns</strong>
+              <small>Today · 10:42</small>
+            </span>
+          </button>
+          <button class="conversation-item" type="button" data-conversation="Threat modeling a small API">
+            <span class="conversation-dot"></span>
+            <span class="conversation-item-copy">
+              <strong>Threat modeling a small API</strong>
+              <small>Yesterday · 18:09</small>
+            </span>
+          </button>
+          <button class="conversation-item" type="button" data-conversation="Python async fundamentals">
+            <span class="conversation-dot"></span>
+            <span class="conversation-item-copy">
+              <strong>Python async fundamentals</strong>
+              <small>Oct 08 · 13:26</small>
+            </span>
+          </button>
+        </div>
+
+        <div class="sidebar-footer">
+          <div class="preview-status">
+            <span class="status-led"></span>
+            <span><strong>Preview mode</strong><small>Backend not connected</small></span>
+          </div>
+          <button class="profile-row" type="button" data-toast="Profile settings are coming with authentication.">
+            <span class="avatar">FT</span>
+            <span class="profile-copy"><strong>FireboxTechs</strong><small>Workspace owner</small></span>
+            <span class="profile-more">•••</span>
+          </button>
+        </div>
+      </aside>
+
+      <button class="sidebar-scrim" id="sidebarScrim" aria-label="Close navigation" type="button"></button>
+
+      <main class="main-shell" id="chat">
+        <header class="topbar">
+          <div class="topbar-left">
+            <button class="icon-button menu-button" id="menuButton" type="button" aria-label="Open navigation">☰</button>
+            <div class="workspace-context">
+              <span class="eyebrow">WORKSPACE / 01</span>
+              <h1>Technical assistant</h1>
+            </div>
+          </div>
+          <div class="topbar-actions">
+            <label class="model-control" for="modelSelect">
+              <span class="model-led"></span>
+              <select id="modelSelect" aria-label="Select model">
+                <option>Firebox Small · Local</option>
+                <option>Qwen 2.5 Coder · Local</option>
+                <option>Llama 3.2 · Local</option>
+              </select>
+            </label>
+            <button class="search-toggle" id="searchToggle" type="button" aria-pressed="false">
+              <span class="search-toggle-icon" aria-hidden="true">⌕</span>
+              <span>Web search</span>
+              <span class="toggle-track"><span class="toggle-thumb"></span></span>
+            </button>
+            <button class="icon-button" type="button" aria-label="Notifications" data-toast="No new notifications.">◌</button>
+          </div>
+        </header>
+
+        <div class="workspace-body">
+          <section class="chat-panel" aria-label="Assistant chat">
+            <div class="conversation-header">
+              <div>
+                <span class="eyebrow">ACTIVE CONVERSATION</span>
+                <h2 id="conversationTitle">API authentication patterns</h2>
+              </div>
+              <div class="conversation-actions">
+                <button class="ghost-button" id="regenerateButton" type="button" disabled>
+                  <span aria-hidden="true">↻</span> Regenerate
+                </button>
+                <button class="icon-button" type="button" aria-label="More conversation options" data-toast="Conversation actions are available in the full app.">•••</button>
+              </div>
+            </div>
+
+            <div class="chat-scroll" id="chatScroll">
+              <div class="message-group assistant-group">
+                <div class="message-meta">
+                  <span class="message-avatar"><img src="/firebox-ai-icon.svg" alt="" /></span>
+                  <span>FIREBOX AI</span>
+                  <span class="message-time">10:42</span>
+                  <span class="source-label">LOCAL MODEL</span>
+                </div>
+                <article class="message-card assistant-message">
+                  <p>Let’s make the next technical decision clearer. I can help you reason through architecture, debug code, or turn dense documentation into a practical plan.</p>
+                  <p>What are you building today?</p>
+                  <div class="response-divider"></div>
+                  <div class="message-note"><span class="note-mark">i</span> Preview response · Connect a model endpoint to enable live generation.</div>
+                </article>
+              </div>
+
+              <div class="quick-prompts" id="quickPrompts" aria-label="Suggested prompts">
+                <button class="prompt-card" type="button" data-prompt="Explain JWT authentication like I am new to backend development.">
+                  <span class="prompt-index">01</span>
+                  <strong>Explain a concept</strong>
+                  <span>Break down JWT authentication for a beginner.</span>
+                </button>
+                <button class="prompt-card" type="button" data-prompt="Review this API design and point out the biggest security risks.">
+                  <span class="prompt-index">02</span>
+                  <strong>Review an architecture</strong>
+                  <span>Spot the risks before they become incidents.</span>
+                </button>
+                <button class="prompt-card" type="button" data-prompt="Write a small Python example that fetches JSON safely and handles errors.">
+                  <span class="prompt-index">03</span>
+                  <strong>Write practical code</strong>
+                  <span>Generate a focused example with explanations.</span>
+                </button>
+              </div>
+
+              <div class="message-group user-group is-hidden" id="seedUserMessage">
+                <div class="message-meta user-meta"><span>You</span><span class="message-time">now</span></div>
+                <article class="message-card user-message" id="seedUserContent"></article>
+              </div>
+
+              <div class="typing-row is-hidden" id="typingRow" aria-live="polite">
+                <span class="message-avatar"><img src="/firebox-ai-icon.svg" alt="" /></span>
+                <div class="typing-bubble"><span></span><span></span><span></span><em>FIREBOX AI is reasoning</em></div>
+              </div>
+
+              <div id="dynamicMessages"></div>
+            </div>
+
+            <form class="composer" id="composer">
+              <div class="attachment-row is-hidden" id="attachmentRow"></div>
+              <label class="composer-input-wrap" for="messageInput">
+                <span class="composer-leading" aria-hidden="true">✦</span>
+                <textarea id="messageInput" rows="1" placeholder="Ask FIREBOX AI anything technical..." aria-label="Message FIREBOX AI"></textarea>
+                <span class="composer-hint">⌘ ↵</span>
+              </label>
+              <div class="composer-toolbar">
+                <div class="composer-tools">
+                  <label class="attach-button" for="fileInput" title="Attach a document">
+                    <span aria-hidden="true">＋</span>
+                    <span>Attach</span>
+                  </label>
+                  <input id="fileInput" type="file" accept=".pdf,.txt,.md,.csv,.json,.py,.js,.ts" multiple />
+                  <span class="toolbar-separator"></span>
+                  <span class="composer-mode"><span class="mode-dot"></span> Answer with sources</span>
+                </div>
+                <div class="composer-actions">
+                  <button class="stop-button is-hidden" id="stopButton" type="button"><span class="stop-square"></span> Stop</button>
+                  <button class="send-button" id="sendButton" type="submit" aria-label="Send message"><span>Send</span><span aria-hidden="true">↗</span></button>
+                </div>
+              </div>
+            </form>
+          </section>
+
+          <aside class="utility-rail" aria-label="Assistant context">
+            <section class="utility-card status-card">
+              <div class="utility-card-heading"><span class="eyebrow">SYSTEM STATUS</span><span class="live-chip"><span></span> LIVE UI</span></div>
+              <div class="status-line"><span class="status-check">✓</span><span><strong>Workspace ready</strong><small>Local interface is operational</small></span></div>
+              <div class="status-line"><span class="status-check">✓</span><span><strong>Conversation memory</strong><small>Session state enabled</small></span></div>
+              <div class="status-line status-line-muted"><span class="status-pending">—</span><span><strong>Model endpoint</strong><small>Connect `/api/chat` to activate</small></span></div>
+            </section>
+
+            <section class="utility-card source-card">
+              <div class="utility-card-heading"><span class="eyebrow">SOURCE LAYERS</span><button class="icon-button small" type="button" aria-label="Source layer information" data-toast="Source layers keep model, document, and web context distinct.">i</button></div>
+              <div class="source-layer is-active"><span class="layer-symbol">M</span><div><strong>Model knowledge</strong><small>Available in preview</small></div><span class="layer-state"></span></div>
+              <div class="source-layer"><span class="layer-symbol">D</span><div><strong>Documents</strong><small>Attach a file to index</small></div><span class="layer-state is-off"></span></div>
+              <div class="source-layer"><span class="layer-symbol">W</span><div><strong>Web research</strong><small>Turn on web search above</small></div><span class="layer-state is-off"></span></div>
+            </section>
+
+            <section class="utility-card recent-card">
+              <div class="utility-card-heading"><span class="eyebrow">RECENT SOURCES</span><span class="source-count">00</span></div>
+              <div class="empty-source"><span class="empty-source-mark">⌁</span><strong>No sources yet</strong><small>Ask a question to see citations here.</small></div>
+            </section>
+
+            <div class="utility-tip"><span class="tip-mark">/</span><p><strong>Build with signal.</strong><br />Attach a source when precision matters.</p></div>
+          </aside>
+        </div>
+      </main>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script src="/app.js" defer></script>
+  </body>
+</html>
