@@ -1,94 +1,208 @@
+const state = { conversationId: null, busy: false, webSearch: false, documents: [], media: [], lastPrompt: '' };
+const $ = (selector) => document.querySelector(selector);
+const messages = $('#messages');
+const welcome = $('#welcome');
+const composer = $('#composer');
+const input = $('#message');
+const send = $('#send');
+const typing = $('#typing');
+const attachmentPreview = $('#attachmentPreview');
+const toast = $('#toast');
+
 const api = async (path, options = {}) => {
   const response = await fetch(`/api${path}`, {
     ...options,
-    headers: { Accept: 'application/json', 'Content-Type': 'application/json', ...(options.headers || {}) },
+    headers: { Accept: 'application/json', ...(options.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }), ...(options.headers || {}) },
   });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(payload.detail || `Request failed (${response.status})`);
   return payload;
 };
 
-const state = { conversationId: null, busy: false };
-const messages = document.querySelector('#messages');
-const welcome = document.querySelector('#welcome');
-const composer = document.querySelector('#composer');
-const input = document.querySelector('#message');
-const send = document.querySelector('#send');
-const typing = document.querySelector('#typing');
-
 function escapeHtml(value) {
   return String(value).replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#039;', '"': '&quot;' }[character]));
 }
-
-function scrollToBottom() { messages.scrollTop = messages.scrollHeight; }
-
-function addMessage(role, content, sources = []) {
-  welcome.classList.add('is-hidden');
-  const item = document.createElement('article');
-  item.className = `message ${role}`;
-  if (role === 'assistant') {
-    const sourceMarkup = sources.length
-      ? `<div class="sources">${sources.map((source, index) => `<span class="source">[S${index + 1}] ${escapeHtml(source.title || 'Source')}${source.page ? ` — p. ${source.page}` : ''}</span>`).join('')}</div>`
-      : '';
-    item.innerHTML = `<div class="assistant-label">FIREBOX AI</div><div class="bubble">${escapeHtml(content)}</div>${sourceMarkup}`;
-  } else {
-    item.innerHTML = `<div class="bubble">${escapeHtml(content)}</div>`;
-  }
-  messages.appendChild(item);
-  scrollToBottom();
+function showToast(message) {
+  toast.textContent = message;
+  toast.classList.add('is-visible');
+  clearTimeout(showToast.timer);
+  showToast.timer = setTimeout(() => toast.classList.remove('is-visible'), 4200);
 }
-
+function scrollToBottom() { requestAnimationFrame(() => { messages.scrollTop = messages.scrollHeight; }); }
 function setBusy(value) {
   state.busy = value;
   send.disabled = value;
   input.disabled = value;
   typing.classList.toggle('is-hidden', !value);
+  $('#statusText').textContent = value ? 'Composing' : 'Ready';
   if (value) scrollToBottom();
 }
-
-async function startConversation() {
-  const result = await api('/conversations', { method: 'POST', body: JSON.stringify({ title: 'User chat' }) });
-  state.conversationId = result.id;
+function resizeInput() {
+  input.style.height = 'auto';
+  input.style.height = `${Math.min(input.scrollHeight, 150)}px`;
 }
 
-async function submit(text) {
-  const prompt = text.trim();
-  if (!prompt || state.busy) return;
-  addMessage('user', prompt);
-  input.value = '';
-  input.style.height = 'auto';
-  setBusy(true);
-  try {
-    if (!state.conversationId) await startConversation();
-    await api(`/conversations/${encodeURIComponent(state.conversationId)}/messages`, {
-      method: 'POST', body: JSON.stringify({ role: 'user', content: prompt }),
-    });
-    const result = await api('/chat', {
-      method: 'POST',
-      body: JSON.stringify({ message: prompt, conversation_id: state.conversationId, webSearch: false }),
-    });
-    addMessage('assistant', result.answer, result.sources || []);
-    await api(`/conversations/${encodeURIComponent(state.conversationId)}/messages`, {
-      method: 'POST',
-      body: JSON.stringify({ role: 'assistant', content: result.answer, metadata: { sources: result.sources || [], teacher_review_id: result.teacher_review_id || null } }),
-    });
-  } catch (error) {
-    addMessage('assistant', `I could not answer that request. ${error.message}`);
-  } finally {
-    setBusy(false);
-    input.focus();
+function inlineMarkdown(text) {
+  let html = escapeHtml(text);
+  html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+  html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+  html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  return html;
+}
+
+function renderMarkdown(source) {
+  const lines = String(source || '').replace(/\r/g, '').split('\n');
+  const output = [];
+  let paragraph = [];
+  let list = [];
+  let ordered = false;
+  let code = null;
+  const flushParagraph = () => { if (paragraph.length) { output.push(`<p>${inlineMarkdown(paragraph.join(' '))}</p>`); paragraph = []; } };
+  const flushList = () => { if (!list.length) return; const tag = ordered ? 'ol' : 'ul'; output.push(`<${tag}>${list.map((item) => `<li>${inlineMarkdown(item)}</li>`).join('')}</${tag}>`); list = []; ordered = false; };
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    if (line.trim().startsWith('```')) {
+      if (code) {
+        const id = `code-${Math.random().toString(36).slice(2)}`;
+        window.__fireboxCode = window.__fireboxCode || {};
+        window.__fireboxCode[id] = code.text;
+        output.push(`<div class="code-card"><div class="code-card-head"><span>${escapeHtml(code.language || 'code')}</span><span><button type="button" data-copy-code="${id}">Copy</button> <button type="button" data-verify-code="${id}">Verify</button></span></div><pre><code>${escapeHtml(code.text)}</code></pre></div>`);
+        code = null;
+      } else {
+        flushParagraph(); flushList(); code = { language: line.trim().slice(3).trim(), text: '' };
+      }
+      continue;
+    }
+    if (code) { code.text += `${line}${index < lines.length - 1 ? '\n' : ''}`; continue; }
+    const tableNext = lines[index + 1] || '';
+    if (/^\s*\|/.test(line) && /^\s*\|?\s*:?-{3,}/.test(tableNext)) {
+      flushParagraph(); flushList();
+      const parseRow = (row) => row.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map((cell) => cell.trim());
+      const head = parseRow(line); const rows = []; index += 2;
+      while (index < lines.length && /^\s*\|/.test(lines[index])) { rows.push(parseRow(lines[index])); index += 1; }
+      index -= 1;
+      output.push(`<div class="rich-table-wrap"><table class="rich-table"><thead><tr>${head.map((cell) => `<th>${inlineMarkdown(cell)}</th>`).join('')}</tr></thead><tbody>${rows.map((row) => `<tr>${head.map((_, cellIndex) => `<td>${inlineMarkdown(row[cellIndex] || '')}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`);
+      continue;
+    }
+    const heading = line.match(/^#{1,3}\s+(.+)/);
+    const bullet = line.match(/^\s*[-*]\s+(?:\[[ xX]\]\s*)?(.+)/);
+    const number = line.match(/^\s*\d+[.)]\s+(.+)/);
+    if (heading) { flushParagraph(); flushList(); const level = Math.min(3, line.match(/^#+/)[0].length); output.push(`<h${level}>${inlineMarkdown(heading[1])}</h${level}>`); continue; }
+    if (bullet || number) { if (number && !ordered) { flushList(); ordered = true; } if (bullet && ordered) flushList(); list.push((bullet || number)[1]); continue; }
+    if (!line.trim()) { flushParagraph(); flushList(); continue; }
+    paragraph.push(line.trim());
   }
+  if (code) output.push(`<div class="code-card"><div class="code-card-head"><span>${escapeHtml(code.language || 'code')}</span></div><pre><code>${escapeHtml(code.text)}</code></pre></div>`);
+  flushParagraph(); flushList();
+  return output.join('') || '<p>No content returned.</p>';
+}
+
+function generatedPanel(prompt, answer) {
+  const checklist = /checklist|steps|plan|to-do|todo/i.test(prompt) || /- \[[ xX]\]/.test(answer);
+  if (!checklist) return '';
+  const items = answer.split('\n').map((line) => line.match(/^\s*(?:[-*]|\d+[.)])\s+(?:\[[ xX]\]\s*)?(.+)/)?.[1]).filter(Boolean).slice(0, 12);
+  if (!items.length) return '';
+  return `<section class="generated-panel"><div class="generated-label">Interactive checklist · generated from this answer</div>${items.map((item) => `<label class="generated-check"><input type="checkbox" /> <span>${inlineMarkdown(item)}</span></label>`).join('')}</section>`;
+}
+function sourceCards(sources = []) {
+  if (!sources.length) return '';
+  return `<section class="sources" aria-label="Sources">${sources.map((source, index) => {
+    const title = escapeHtml(source.title || `Source ${index + 1}`);
+    const detail = `${source.page ? `Page ${source.page}` : source.url ? 'Web source' : 'Uploaded knowledge'}${source.snippet ? ` · ${escapeHtml(source.snippet.slice(0, 130))}` : ''}`;
+    const content = `<strong>[S${index + 1}] ${title}</strong><small>${detail}</small>`;
+    return source.url ? `<a class="source-card" href="${escapeHtml(source.url)}" target="_blank" rel="noopener noreferrer">${content}</a>` : `<div class="source-card">${content}</div>`;
+  }).join('')}</section>`;
+}
+
+function addMessage(role, content, sources = [], prompt = '') {
+  welcome.classList.add('is-hidden');
+  const item = document.createElement('article');
+  item.className = `message ${role}`;
+  if (role === 'user') {
+    item.innerHTML = `<div class="bubble">${escapeHtml(content).replace(/\n/g, '<br>')}</div>`;
+  } else {
+    item.innerHTML = `<div class="assistant-label">FIREBOX AI · RICH RESPONSE</div><div class="bubble"><div class="rich-content">${renderMarkdown(content)}</div>${generatedPanel(prompt, content)}${sourceCards(sources)}<div class="response-actions"><button class="response-action" type="button" data-copy-answer>Copy answer</button><button class="response-action" type="button" data-regenerate>Regenerate</button></div></div>`;
+    item.dataset.prompt = prompt;
+  }
+  messages.appendChild(item);
+  scrollToBottom();
+  return item;
+}
+
+async function startConversation(title) {
+  const result = await api('/conversations', { method: 'POST', body: JSON.stringify({ title }) });
+  state.conversationId = result.id;
+}
+async function persistMessage(role, content, metadata = {}) {
+  if (!state.conversationId) return;
+  await api(`/conversations/${encodeURIComponent(state.conversationId)}/messages`, { method: 'POST', body: JSON.stringify({ role, content, metadata }) });
+}
+
+async function submit(rawText) {
+  const prompt = rawText.trim();
+  if (!prompt || state.busy) return;
+  state.lastPrompt = prompt;
+  addMessage('user', prompt);
+  input.value = ''; resizeInput(); setBusy(true);
+  try {
+    if (!state.conversationId) await startConversation(prompt.slice(0, 72));
+    await persistMessage('user', prompt);
+    const result = await api('/chat', { method: 'POST', body: JSON.stringify({ message: prompt, conversation_id: state.conversationId, webSearch: state.webSearch, document_ids: state.documents.map((doc) => doc.id) }) });
+    addMessage('assistant', result.answer, result.sources || [], prompt);
+    await persistMessage('assistant', result.answer, { sources: result.sources || [], teacher_review_id: result.teacher_review_id || null });
+  } catch (error) {
+    addMessage('assistant', `I could not complete that request. ${error.message}`);
+  } finally { setBusy(false); input.focus(); }
+}
+
+async function uploadFile(file) {
+  const supported = ['.pdf', '.txt', '.md', '.csv', '.json', '.py', '.js', '.ts'].some((extension) => file.name.toLowerCase().endsWith(extension));
+  if (!supported) {
+    state.media.push({ name: file.name, type: file.type, url: file.type.startsWith('image/') ? URL.createObjectURL(file) : null });
+    renderAttachments();
+    showToast(`${file.name} is previewed locally. This deployment grounds answers from PDF and text files.`);
+    return;
+  }
+  const form = new FormData(); form.append('file', file);
+  try {
+    const document = await api('/documents/upload', { method: 'POST', body: form });
+    state.documents.push(document); renderAttachments();
+    showToast(`${file.name} is ready as knowledge for the next answer.`);
+  } catch (error) { showToast(`Could not upload ${file.name}: ${error.message}`); }
+}
+function renderAttachments() {
+  const documentChips = state.documents.map((doc, index) => `<span class="attachment-chip"><span aria-hidden="true">▧</span><span>${escapeHtml(doc.filename)}</span><button type="button" data-remove-document="${index}" aria-label="Remove ${escapeHtml(doc.filename)}">×</button></span>`).join('');
+  const mediaChips = state.media.map((file, index) => `<span class="attachment-chip">${file.url ? `<img src="${file.url}" alt="" />` : '<span aria-hidden="true">◉</span>'}<span>${escapeHtml(file.name)}</span><button type="button" data-remove-media="${index}" aria-label="Remove ${escapeHtml(file.name)}">×</button></span>`).join('');
+  attachmentPreview.innerHTML = `${documentChips}${mediaChips}${state.media.length ? '<span class="attachment-note">Media preview attached; add a prompt to continue.</span>' : ''}`;
+  attachmentPreview.classList.toggle('is-hidden', !documentChips && !mediaChips);
+}
+async function verifyCode(id, button) {
+  const code = window.__fireboxCode?.[id] || '';
+  const language = button.closest('.code-card')?.querySelector('.code-card-head span')?.textContent || 'code';
+  const tool = language.toLowerCase().includes('python') ? 'python_syntax' : language.toLowerCase().includes('json') ? 'json_validate' : null;
+  if (!tool) return showToast('Verification is available for Python and JSON code blocks.');
+  button.disabled = true;
+  try { const result = await api('/tools/verify', { method: 'POST', body: JSON.stringify({ tool, input: code }) }); showToast(result.message); }
+  catch (error) { showToast(`Verification failed: ${error.message}`); }
+  finally { button.disabled = false; }
 }
 
 composer.addEventListener('submit', (event) => { event.preventDefault(); void submit(input.value); });
-input.addEventListener('input', () => { input.style.height = 'auto'; input.style.height = `${Math.min(input.scrollHeight, 140)}px`; });
-input.addEventListener('keydown', (event) => {
-  if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void submit(input.value); }
-});
-document.querySelectorAll('[data-prompt]').forEach((button) => button.addEventListener('click', () => void submit(button.dataset.prompt)));
-document.querySelector('#newChat').addEventListener('click', () => {
-  state.conversationId = null;
-  messages.querySelectorAll('.message').forEach((item) => item.remove());
-  welcome.classList.remove('is-hidden');
-  input.focus();
+input.addEventListener('input', resizeInput);
+input.addEventListener('keydown', (event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void submit(input.value); } });
+document.querySelectorAll('[data-prompt]').forEach((button) => button.addEventListener('click', () => { if (button.dataset.scroll) $('#composer').scrollIntoView({ behavior: 'smooth', block: 'center' }); void submit(button.dataset.prompt); }));
+$('#newChat').addEventListener('click', () => { state.conversationId = null; state.documents = []; state.media = []; messages.querySelectorAll('.message').forEach((item) => item.remove()); welcome.classList.remove('is-hidden'); renderAttachments(); input.focus(); });
+$('#searchButton').addEventListener('click', () => { state.webSearch = !state.webSearch; $('#searchButton').setAttribute('aria-pressed', String(state.webSearch)); showToast(state.webSearch ? 'Web search is on for the next answer.' : 'Web search is off.'); });
+$('#attachButton').addEventListener('click', () => $('#fileInput').click());
+$('#fileInput').addEventListener('change', async (event) => { for (const file of event.target.files) await uploadFile(file); event.target.value = ''; });
+attachmentPreview.addEventListener('click', (event) => { const documentIndex = event.target.closest('[data-remove-document]')?.dataset.removeDocument; const mediaIndex = event.target.closest('[data-remove-media]')?.dataset.removeMedia; if (documentIndex !== undefined) state.documents.splice(Number(documentIndex), 1); if (mediaIndex !== undefined) { const removed = state.media.splice(Number(mediaIndex), 1)[0]; if (removed?.url) URL.revokeObjectURL(removed.url); } renderAttachments(); });
+messages.addEventListener('click', async (event) => {
+  const copyCode = event.target.closest('[data-copy-code]');
+  const verify = event.target.closest('[data-verify-code]');
+  const copyAnswer = event.target.closest('[data-copy-answer]');
+  const regenerate = event.target.closest('[data-regenerate]');
+  if (copyCode) { await navigator.clipboard.writeText(window.__fireboxCode?.[copyCode.dataset.copyCode] || ''); showToast('Code copied.'); }
+  if (verify) await verifyCode(verify.dataset.verifyCode, verify);
+  if (copyAnswer) { const content = copyAnswer.closest('.bubble')?.querySelector('.rich-content')?.innerText || ''; await navigator.clipboard.writeText(content); showToast('Answer copied.'); }
+  if (regenerate) void submit(regenerate.closest('.message')?.dataset.prompt || state.lastPrompt);
 });

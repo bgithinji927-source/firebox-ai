@@ -11,6 +11,7 @@ A single-workspace technical AI assistant for programming, cybersecurity, techni
 - Chat requests start with the locally trained FIREBOX model checkpoint. No external model provider is required; Groq supervision is optional when `GROQ_API_KEY` is configured.
 - When `GROQ_API_KEY` is configured, an optional Groq teacher reviews the local draft against retrieved evidence and rewrites it into a clear answer; local and extractive fallbacks remain available if Groq is unavailable.
 - PDF and supported text files are validated, extracted, chunked, indexed in MongoDB, and made available for lexical retrieval. Retrieved passages include document and page references where available.
+- The `/chat` experience provides capability cards, rich Markdown/code/table rendering, interactive checklists, copy/regenerate/verify actions, web-search toggles, source cards, and drag-free file attachment previews. PDF and supported text attachments become knowledge sources for the next answer; image, audio, and video files are previewed in the composer and clearly labeled when the current text checkpoint cannot inspect their contents.
 - Optional web search uses Tavily for current source discovery only; it is not an AI model and is never used to generate answers.
 - Server-side HTTP Basic Authentication protects the UI and API. `/api/health` is public and reports service readiness without exposing credentials.
 - The single-workspace owner is fixed by `FIREBOX_OWNER_ID`; client-supplied owner headers are ignored.

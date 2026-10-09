@@ -3,7 +3,8 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>FIREBOX AI — Assistant</title>
+    <meta name="description" content="FIREBOX AI — a technical assistant with rich, interactive responses." />
+    <title>FIREBOX AI — Generative Assistant</title>
     <link rel="icon" href="/firebox-ai-icon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="/chat.css" />
   </head>
@@ -12,11 +13,11 @@
       <header class="chat-header">
         <a class="brand" href="/chat" aria-label="FIREBOX AI home">
           <img src="/firebox-ai-icon.svg" alt="" />
-          <span><strong>FIREBOX AI</strong><small>Technical assistant</small></span>
+          <span><strong>FIREBOX AI</strong><small>Generative technical assistant</small></span>
         </a>
         <div class="header-actions">
-          <span class="status"><i></i> AI assistant</span>
-          <button id="newChat" type="button">New chat</button>
+          <span class="status"><i></i><span id="statusText">Ready</span></span>
+          <button id="newChat" class="secondary-button" type="button">New chat</button>
         </div>
       </header>
 
@@ -24,23 +25,41 @@
         <div class="messages" id="messages" aria-live="polite">
           <div class="welcome" id="welcome">
             <div class="welcome-mark"><img src="/firebox-ai-icon.svg" alt="" /></div>
-            <h1>How can I help?</h1>
-            <p>Ask a technical question about programming, databases, cybersecurity, or your uploaded knowledge.</p>
-            <div class="suggestions">
-              <button type="button" data-prompt="What is SQL injection?">What is SQL injection?</button>
-              <button type="button" data-prompt="Explain databases in simple terms.">Explain databases simply</button>
-              <button type="button" data-prompt="How do I debug a Python error?">How do I debug Python?</button>
+            <p class="eyebrow">ASK. EXPLORE. BUILD.</p>
+            <h1>Answers that become useful interfaces.</h1>
+            <p class="welcome-copy">FIREBOX AI turns technical questions into clear explanations, interactive checklists, comparison tables, code cards, source panels, and document-grounded answers.</p>
+            <div class="capability-grid" aria-label="FIREBOX AI capabilities">
+              <button class="capability-card" type="button" data-prompt="Create a secure deployment checklist for a FastAPI app."><span class="capability-icon">✦</span><strong>Generative UI</strong><small>Turn an idea into a useful visual workflow.</small></button>
+              <button class="capability-card" type="button" data-prompt="Compare SQL and NoSQL databases in a table."><span class="capability-icon">▦</span><strong>Rich responses</strong><small>Get formatted text, tables, cards, and code.</small></button>
+              <button class="capability-card" type="button" data-prompt="Give me an interactive debugging checklist for a Python error."><span class="capability-icon">☑</span><strong>Interactive UI</strong><small>Work through checklists and actions in place.</small></button>
+              <button class="capability-card" type="button" data-prompt="Explain how to review an uploaded technical document."><span class="capability-icon">◫</span><strong>Knowledge grounding</strong><small>Upload files and cite relevant passages.</small></button>
+              <button class="capability-card" type="button" data-prompt="What kinds of files can I share with you?" data-scroll="composer"><span class="capability-icon">◉</span><strong>Multimodal input</strong><small>Share text, documents, images, audio, or video.</small></button>
+            </div>
+            <div class="suggestions" aria-label="Suggested prompts">
+              <button type="button" data-prompt="What is SQL injection?">Explain SQL injection</button>
+              <button type="button" data-prompt="How do I debug a Python error?">Debug Python</button>
+              <button type="button" data-prompt="Show a JSON example for an API response.">Show JSON example</button>
             </div>
           </div>
         </div>
-        <div class="typing is-hidden" id="typing"><span></span><span></span><span></span><em>FIREBOX AI is thinking</em></div>
+        <div class="typing is-hidden" id="typing"><span></span><span></span><span></span><em>FIREBOX AI is composing a rich response</em></div>
+        <div class="attachment-preview is-hidden" id="attachmentPreview" aria-live="polite"></div>
         <form class="composer" id="composer">
-          <textarea id="message" rows="1" placeholder="Message FIREBOX AI..." aria-label="Message FIREBOX AI"></textarea>
-          <button id="send" type="submit" aria-label="Send message">↑</button>
+          <div class="composer-main">
+            <textarea id="message" rows="1" placeholder="Ask FIREBOX AI to explain, compare, build, or verify…" aria-label="Message FIREBOX AI"></textarea>
+            <div class="composer-tools">
+              <input id="fileInput" type="file" hidden multiple accept=".pdf,.txt,.md,.csv,.json,.py,.js,.ts,image/*,audio/*,video/*" />
+              <button class="tool-button" id="attachButton" type="button" title="Attach a file">＋ Attach</button>
+              <button class="tool-button" id="searchButton" type="button" aria-pressed="false" title="Search the web for current sources">⌕ Web search</button>
+              <span class="tool-hint">Enter to send · Shift + Enter for a new line</span>
+            </div>
+          </div>
+          <button id="send" class="send-button" type="submit" aria-label="Send message">↑</button>
         </form>
         <p class="disclaimer">FIREBOX AI can make mistakes. Check important technical and security advice.</p>
       </section>
     </main>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
     <script src="/chat.js" defer></script>
   </body>
 </html>
