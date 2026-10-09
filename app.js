@@ -19,6 +19,8 @@ function cacheDom() {
   dom.sidebar = document.querySelector('#sidebar');
   dom.sidebarScrim = document.querySelector('#sidebarScrim');
   dom.menuButton = document.querySelector('#menuButton');
+  dom.mainShell = document.querySelector('#chat');
+  dom.workspaceHeading = document.querySelector('#workspaceHeading');
   dom.newChatButton = document.querySelector('#newChatButton');
   dom.conversationList = document.querySelector('#conversationList');
   dom.conversationTitle = document.querySelector('#conversationTitle');
@@ -411,7 +413,9 @@ function attachEvents() {
       item.classList.add('is-active');
       item.setAttribute('aria-current', 'page');
       document.querySelectorAll('.nav-item').forEach((nav) => { if (nav !== item) nav.removeAttribute('aria-current'); });
-      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      dom.mainShell.dataset.view = item.dataset.panelTarget === 'chat' ? 'assistant' : item.dataset.panelTarget;
+      const titles = { assistant: 'FIREBOX Brain Workspace', knowledgeLibrary: 'Knowledge Library', activity: 'Activity & Sources', brainLab: 'FIREBOX Brain Lab' };
+      dom.workspaceHeading.textContent = titles[dom.mainShell.dataset.view] || 'FIREBOX Brain Workspace';
       setSidebar(false);
     });
   });

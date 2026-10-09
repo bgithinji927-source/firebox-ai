@@ -461,3 +461,33 @@ html, body { height: 100%; overflow: hidden; }
 @media (prefers-color-scheme: dark) {
   .utility-card:target { outline-color: #f5f5f5; }
 }
+
+/* Full-width dashboard pages: secondary destinations must not squeeze beside the chat. */
+.main-shell[data-view="knowledgeLibrary"] .chat-panel,
+.main-shell[data-view="activity"] .chat-panel,
+.main-shell[data-view="brainLab"] .chat-panel { display: none; }
+.main-shell[data-view="knowledgeLibrary"] .utility-rail,
+.main-shell[data-view="activity"] .utility-rail,
+.main-shell[data-view="brainLab"] .utility-rail {
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(0, 1fr);
+  max-height: none;
+  overflow: visible;
+  padding-top: 0;
+  align-content: start;
+}
+.main-shell[data-view="knowledgeLibrary"] .utility-rail > *,
+.main-shell[data-view="activity"] .utility-rail > *,
+.main-shell[data-view="brainLab"] .utility-rail > * { display: none; }
+.main-shell[data-view="knowledgeLibrary"] .utility-rail .source-card,
+.main-shell[data-view="activity"] .utility-rail .recent-card,
+.main-shell[data-view="brainLab"] .utility-rail .brain-card { display: block; min-height: 280px; }
+.main-shell[data-view="knowledgeLibrary"] .utility-rail .source-card::after {
+  content: "Attach PDF or text files from the Assistant view to build your MongoDB-backed knowledge library.";
+  display: block; margin-top: 24px; padding: 24px; border: 1px dashed var(--line); border-radius: 10px; color: var(--ink-muted); font-size: 16px;
+}
+.main-shell[data-view="activity"] .utility-rail .recent-card,
+.main-shell[data-view="brainLab"] .utility-rail .brain-card { padding: 28px; }
+.main-shell[data-view="activity"] .utility-rail .recent-card .empty-source { min-height: 220px; }
+.main-shell[data-view="brainLab"] .utility-rail .brain-card .brain-stats { max-width: 520px; }
+.main-shell[data-view="brainLab"] .utility-rail .brain-card .lab-button { max-width: 360px; }
