@@ -77,6 +77,32 @@ function renderCardRail(rows, mode = 'info') {
   return `<section class="generated-card-rail" aria-label="Generated interface cards"><div class="generated-card-rail-label">Generated interface</div><div class="generated-card-scroller">${cards.join('')}</div></section>`;
 }
 
+function renderApprovalBlock(rows) {
+  const row = rows.find(Boolean) || 'Continue | Approve this next step';
+  const separator = row.indexOf('|');
+  const title = separator >= 0 ? row.slice(0, separator).trim() : row.trim();
+  const description = separator >= 0 ? row.slice(separator + 1).trim() : '';
+  const action = `Approved: ${title}. Continue with the next step.`;
+  return `<section class="approval-block" aria-label="Approval required"><div class="approval-kicker">Approval required</div><h3>${inlineMarkdown(title)}</h3>${description ? `<p>${inlineMarkdown(description)}</p>` : ''}<div class="approval-actions"><button type="button" class="approval-button" data-approve-action="${escapeHtml(action)}">✓ Approve and continue</button><button type="button" class="approval-dismiss" data-approval-dismiss>Not now</button></div></section>`;
+}
+
+function renderActionButtons(rows) {
+  const buttons = rows.map((row) => {
+    const separator = row.indexOf('|');
+    const label = separator >= 0 ? row.slice(0, separator).trim() : row.trim();
+    const prompt = separator >= 0 ? row.slice(separator + 1).trim() : label;
+    return label ? `<button type="button" class="generated-action-button" data-send-suggestion="${escapeHtml(prompt)}">${inlineMarkdown(label)} <span aria-hidden="true">→</span></button>` : '';
+  }).filter(Boolean);
+  return buttons.length ? `<div class="generated-actions" aria-label="Generated actions">${buttons.join('')}</div>` : '';
+}
+
+function renderFlowChart(rows, direction = 'horizontal') {
+  const nodes = [];
+  rows.forEach((row) => row.split(/\s*[-=]+>\s*/).map((item) => item.trim()).filter(Boolean).forEach((item) => { if (!nodes.includes(item)) nodes.push(item); }));
+  if (!nodes.length) return '';
+  return `<section class="generated-flow" aria-label="Generated flow chart"><div class="generated-card-rail-label">Generated flow chart</div><div class="flow-track ${direction === 'vertical' ? 'is-vertical' : ''}">${nodes.map((node, index) => `${index ? '<span class="flow-arrow" aria-hidden="true">→</span>' : ''}<div class="flow-node">${inlineMarkdown(node)}</div>`).join('')}</div></section>`;
+}
+
 function renderMarkdown(source) {
   const lines = String(source || '').replace(/\r/g, '').split('\n');
   const output = [];
@@ -87,11 +113,24 @@ function renderMarkdown(source) {
   let quote = [];
   let cards = null;
   let cardMode = 'info';
+  let special = null;
+  let specialMode = '';
   const flushParagraph = () => { if (paragraph.length) { output.push(`<p>${inlineMarkdown(paragraph.join(' '))}</p>`); paragraph = []; } };
   const flushList = () => { if (!list.length) return; const tag = ordered ? 'ol' : 'ul'; output.push(`<${tag}>${list.map((item) => `<li>${inlineMarkdown(item)}</li>`).join('')}</${tag}>`); list = []; ordered = false; };
   const flushQuote = () => { if (quote.length) { output.push(`<blockquote>${quote.map((item) => inlineMarkdown(item)).join('<br>')}</blockquote>`); quote = []; } };
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index];
+    const specialStart = line.trim().match(/^:::(approve|buttons|flow)(?:\s+(vertical))?$/i);
+    if (specialStart) { flushParagraph(); flushList(); flushQuote(); special = []; specialMode = `${specialStart[1].toLowerCase()}${specialStart[2] ? `-${specialStart[2].toLowerCase()}` : ''}`; continue; }
+    if (special) {
+      if (line.trim() === ':::') {
+        if (specialMode === 'approve') output.push(renderApprovalBlock(special));
+        if (specialMode === 'buttons') output.push(renderActionButtons(special));
+        if (specialMode === 'flow' || specialMode === 'flow-vertical') output.push(renderFlowChart(special, specialMode === 'flow-vertical' ? 'vertical' : 'horizontal'));
+        special = null; specialMode = '';
+      } else if (line.trim()) special.push(line.trim());
+      continue;
+    }
     if (line.trim().toLowerCase().startsWith(':::cards')) { flushParagraph(); flushList(); flushQuote(); cards = []; cardMode = line.trim().split(/\s+/)[1]?.toLowerCase() || 'info'; continue; }
     if (cards) {
       if (line.trim() === ':::') { output.push(renderCardRail(cards, cardMode)); cards = null; cardMode = 'info'; }
@@ -138,6 +177,11 @@ function renderMarkdown(source) {
     paragraph.push(line.trim());
   }
   if (cards) output.push(renderCardRail(cards, cardMode));
+  if (special) {
+    if (specialMode === 'approve') output.push(renderApprovalBlock(special));
+    if (specialMode === 'buttons') output.push(renderActionButtons(special));
+    if (specialMode === 'flow' || specialMode === 'flow-vertical') output.push(renderFlowChart(special, specialMode === 'flow-vertical' ? 'vertical' : 'horizontal'));
+  }
   if (code) output.push(`<div class="code-card"><div class="code-card-head"><span>${escapeHtml(code.language || 'code')}</span></div><pre><code>${highlightCode(code.text, code.language)}</code></pre></div>`);
   flushParagraph(); flushList(); flushQuote();
   return output.join('') || '<p>No content returned.</p>';
@@ -245,12 +289,16 @@ $('#fileInput').addEventListener('change', async (event) => { for (const file of
 attachmentPreview.addEventListener('click', (event) => { const documentIndex = event.target.closest('[data-remove-document]')?.dataset.removeDocument; const mediaIndex = event.target.closest('[data-remove-media]')?.dataset.removeMedia; if (documentIndex !== undefined) state.documents.splice(Number(documentIndex), 1); if (mediaIndex !== undefined) { const removed = state.media.splice(Number(mediaIndex), 1)[0]; if (removed?.url) URL.revokeObjectURL(removed.url); } renderAttachments(); });
 messages.addEventListener('click', async (event) => {
   const suggestion = event.target.closest('[data-send-suggestion]');
+  const approve = event.target.closest('[data-approve-action]');
+  const dismissApproval = event.target.closest('[data-approval-dismiss]');
   const copyCode = event.target.closest('[data-copy-code]');
   const verify = event.target.closest('[data-verify-code]');
   const copyAnswer = event.target.closest('[data-copy-answer]');
   const regenerate = event.target.closest('[data-regenerate]');
   if (copyCode) { await navigator.clipboard.writeText(window.__fireboxCode?.[copyCode.dataset.copyCode] || ''); showToast('Code copied.'); }
   if (suggestion) void submit(suggestion.dataset.sendSuggestion || '');
+  if (approve) { approve.disabled = true; approve.closest('.approval-block')?.classList.add('is-approved'); void submit(approve.dataset.approveAction || 'Approved. Continue.'); }
+  if (dismissApproval) dismissApproval.closest('.approval-block')?.classList.add('is-dismissed');
   if (verify) await verifyCode(verify.dataset.verifyCode, verify);
   if (copyAnswer) { const content = copyAnswer.closest('.bubble')?.querySelector('.rich-content')?.innerText || ''; await navigator.clipboard.writeText(content); showToast('Answer copied.'); }
   const shareAnswer = event.target.closest('[data-share-answer]');

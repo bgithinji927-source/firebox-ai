@@ -119,3 +119,27 @@ body, :root { background: #000; }
 .rich-content h4 { font-size: 15px; }
 .rich-content h5 { font-size: 14px; color: var(--soft); }
 .rich-content h6 { font-size: 13px; color: var(--muted); letter-spacing: .02em; }
+
+/* Readability and lighter dark mode */
+:root { --bg: #101418; --panel: #171d23; --panel-2: #1d262d; --line: #35414a; --muted: #aab5bf; --soft: #d7dfe5; }
+body, :root { background: #101418; }
+body { background: radial-gradient(circle at 50% -20%, #26343d 0, var(--bg) 52%); }
+.chat-header { background: rgba(20, 26, 31, .92); }
+.bubble, .rich-content { font-size: 16px; }
+.rich-content { line-height: 1.75; }
+.rich-content h2 { font-size: 22px; }.rich-content h3 { font-size: 18px; }
+.generated-card { flex-basis: min(250px, 72vw); min-height: 132px; padding: 15px; border-color: #3a4852; background: linear-gradient(145deg, #1b2329, #141a1f); }
+.generated-card h3 { font-size: 17px; }.generated-card p { font-size: 14px; }
+.generated-card-icon { width: 26px; height: 26px; margin-bottom: 16px; }
+.generated-card-check, .generated-card-send { font-size: 13px; }
+.generated-actions { display: flex; flex-wrap: wrap; gap: 9px; margin: 16px 0; }
+.generated-action-button, .approval-button, .approval-dismiss { padding: 10px 13px; border: 1px solid #52636e; border-radius: 9px; background: #1b252c; color: var(--soft); font-size: 14px; cursor: pointer; }
+.generated-action-button:hover, .approval-button:hover { border-color: var(--accent); color: var(--accent); }
+.generated-action-button span { color: var(--accent); }
+.approval-block { margin: 18px 0; padding: 17px; border: 1px solid #6b7d55; border-radius: 13px; background: linear-gradient(135deg, rgba(185,244,107,.12), rgba(39, 50, 46, .55)); }
+.approval-kicker { margin-bottom: 8px; color: var(--accent); font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+.approval-block h3 { margin: 0; font-size: 18px; }.approval-block p { margin: 8px 0 0; color: var(--soft); }
+.approval-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 15px; }.approval-button { border-color: var(--accent); background: rgba(185,244,107,.16); color: var(--accent); font-weight: 750; }.approval-dismiss { background: transparent; color: var(--muted); }
+.approval-block.is-approved { border-color: var(--accent); opacity: .72; }.approval-block.is-approved .approval-kicker::after { content: ' · approved'; }.approval-block.is-dismissed { opacity: .5; }
+.generated-flow { margin: 18px 0; }.flow-track { display: flex; align-items: center; gap: 10px; overflow-x: auto; padding: 9px 3px 14px; scroll-snap-type: x proximity; }.flow-track.is-vertical { flex-direction: column; align-items: stretch; overflow-x: visible; }.flow-node { flex: 0 0 auto; min-width: 150px; padding: 14px 16px; border: 1px solid #536b79; border-radius: 12px; background: #1a252c; color: #f5f8fa; font-size: 15px; text-align: center; scroll-snap-align: start; }.flow-arrow { flex: 0 0 auto; color: var(--accent); font-size: 24px; }.flow-track.is-vertical .flow-arrow { transform: rotate(90deg); }
+@media (max-width: 600px) { .bubble, .rich-content { font-size: 16px; }.generated-card { flex-basis: 72vw; }.flow-node { min-width: 68vw; }.approval-block { padding: 14px; } }
