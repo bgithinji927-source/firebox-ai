@@ -491,3 +491,30 @@ html, body { height: 100%; overflow: hidden; }
 .main-shell[data-view="activity"] .utility-rail .recent-card .empty-source { min-height: 220px; }
 .main-shell[data-view="brainLab"] .utility-rail .brain-card .brain-stats { max-width: 520px; }
 .main-shell[data-view="brainLab"] .utility-rail .brain-card .lab-button { max-width: 360px; }
+
+.library-hero { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 18px; padding: 18px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-alt); }
+.library-hero strong, .library-hero small { display: block; }
+.library-hero strong { font-size: 18px; }
+.library-hero small { max-width: 620px; margin-top: 6px; color: var(--ink-muted); font-size: 14px; line-height: 1.45; }
+.library-upload { flex: 0 0 auto; padding: 11px 14px; border: 1px solid var(--ink); border-radius: 8px; background: var(--ink); color: var(--surface); cursor: pointer; font-size: 14px; font-weight: 700; }
+.knowledge-document-list { display: grid; gap: 8px; margin-bottom: 20px; }
+.knowledge-empty { padding: 28px; border: 1px dashed var(--line); border-radius: 10px; color: var(--ink-muted); font-size: 15px; }
+.knowledge-document { display: flex; align-items: center; gap: 13px; padding: 13px; border: 1px solid var(--line); border-radius: 9px; }
+.document-file-icon { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 7px; background: var(--ink); color: var(--surface); font-family: "SFMono-Regular", Consolas, monospace; font-size: 11px; font-weight: 800; }
+.knowledge-document-copy { min-width: 0; display: grid; gap: 5px; }
+.knowledge-document-copy strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 16px; }
+.knowledge-document-copy small { color: var(--ink-muted); font-family: "SFMono-Regular", Consolas, monospace; font-size: 12px; }
+.document-delete { margin-left: auto; width: 30px; height: 30px; border: 1px solid var(--line); border-radius: 6px; background: transparent; color: var(--ink-muted); cursor: pointer; font-size: 20px; line-height: 1; }
+.document-delete:hover { border-color: var(--ink); color: var(--ink); }
+.teaching-methods { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 18px 0; }
+.teaching-methods div { padding: 12px; border: 1px solid var(--line); border-radius: 8px; }
+.teaching-methods strong, .teaching-methods small { display: block; }
+.teaching-methods strong { font-family: "SFMono-Regular", Consolas, monospace; font-size: 11px; letter-spacing: .08em; }
+.teaching-methods small { margin-top: 5px; color: var(--ink-muted); font-size: 13px; line-height: 1.35; }
+@media (prefers-color-scheme: dark) {
+  .library-hero { background: #2b2b2b; }
+  .knowledge-empty, .knowledge-document, .teaching-methods div { border-color: #4b4b4b; }
+  .knowledge-document-copy small, .library-hero small, .knowledge-empty, .teaching-methods small { color: #aaa; }
+  .document-delete { border-color: #555; color: #aaa; }
+}
+.main-shell[data-view="knowledgeLibrary"] .utility-rail .source-card::after { content: none; display: none; }

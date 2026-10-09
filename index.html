@@ -173,6 +173,11 @@
 
             <section class="utility-card source-card" id="knowledgeLibrary">
               <div class="utility-card-heading"><span class="eyebrow">SOURCE LAYERS</span><button class="icon-button small" type="button" aria-label="Source layer information" data-toast="Source layers keep model, document, and web context distinct.">i</button></div>
+              <div class="library-hero">
+                <div><strong>Teach with knowledge</strong><small>Upload PDFs and text files. They will be indexed in MongoDB and appear below.</small></div>
+                <label class="library-upload" for="fileInput">＋ Upload file</label>
+              </div>
+              <div class="knowledge-document-list" id="knowledgeDocumentList"><div class="knowledge-empty">No documents uploaded yet.</div></div>
               <div class="source-layer"><span class="layer-symbol">M</span><div><strong>FIREBOX model</strong><small>Local trainable checkpoint</small></div><span class="layer-state is-off"></span></div>
               <div class="source-layer"><span class="layer-symbol">D</span><div><strong>Documents</strong><small>PDF/text extraction and retrieval</small></div><span class="layer-state is-off"></span></div>
               <div class="source-layer"><span class="layer-symbol">W</span><div><strong>Web research</strong><small>Requires a configured search key</small></div><span class="layer-state is-off"></span></div>
@@ -185,6 +190,12 @@
                 <div><strong id="lessonCount">0</strong><small>lessons</small></div>
                 <div><strong id="feedbackCount">0</strong><small>feedback</small></div>
                 <div><strong id="knowledgeCount">0</strong><small>facts</small></div>
+              </div>
+              <div class="teaching-methods">
+                <div><strong>DOCUMENTS</strong><small>RAG memory from PDFs and files</small></div>
+                <div><strong>LESSONS</strong><small>Approved instruction and answer examples</small></div>
+                <div><strong>FEEDBACK</strong><small>Corrections collected for retraining</small></div>
+                <div><strong>FACTS</strong><small>Owner-approved knowledge items</small></div>
               </div>
               <button class="lab-button" id="trainingGuideButton" type="button">Open training guide <span>↗</span></button>
             </section>

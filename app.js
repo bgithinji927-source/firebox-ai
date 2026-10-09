@@ -56,6 +56,7 @@ function cacheDom() {
   dom.feedbackCount = document.querySelector('#feedbackCount');
   dom.knowledgeCount = document.querySelector('#knowledgeCount');
   dom.trainingGuideButton = document.querySelector('#trainingGuideButton');
+  dom.knowledgeDocumentList = document.querySelector('#knowledgeDocumentList');
   dom.toast = document.querySelector('#toast');
 }
 
@@ -143,6 +144,20 @@ function renderAttachments() {
     <span class="attachment-chip"><span aria-hidden="true">▧</span>${escapeHtml(doc.filename)}<button type="button" data-remove-document="${index}" aria-label="Remove ${escapeHtml(doc.filename)} from this prompt">×</button></span>
   `).join('');
   dom.attachmentRow.classList.toggle('is-hidden', state.selectedDocuments.length === 0);
+}
+
+function renderKnowledgeDocuments(items = []) {
+  if (!dom.knowledgeDocumentList) return;
+  if (!items.length) {
+    dom.knowledgeDocumentList.innerHTML = '<div class="knowledge-empty">No documents uploaded yet. Upload a PDF to begin teaching through RAG.</div>';
+    return;
+  }
+  dom.knowledgeDocumentList.innerHTML = items.map((document) => `
+    <div class="knowledge-document">
+      <span class="document-file-icon">PDF</span>
+      <div class="knowledge-document-copy"><strong>${escapeHtml(document.filename)}</strong><small>${escapeHtml(document.processing_status || document.status || 'processed')} · ${document.chunk_count || 0} chunks · ${Math.ceil((document.size_bytes || 0) / 1024)} KB</small></div>
+      <button type="button" class="document-delete" data-delete-document="${escapeHtml(document.id)}" aria-label="Delete ${escapeHtml(document.filename)}">×</button>
+    </div>`).join('');
 }
 
 function renderConversations(items) {
@@ -320,6 +335,8 @@ async function uploadDocuments(files) {
     try {
       const document = await api('/documents/upload', { method: 'POST', body: formData });
       state.selectedDocuments.push(document);
+      state.allDocuments = [document, ...(state.allDocuments || []).filter((item) => item.id !== document.id)];
+      renderKnowledgeDocuments(state.allDocuments);
       dom.documentCount.textContent = String(Number(dom.documentCount.textContent || 0) + 1);
       renderAttachments();
       showToast(`${document.filename} processed (${document.chunk_count} text chunks).`);
@@ -349,6 +366,7 @@ async function syncBackendStatus() {
       await refreshConversations();
       await api('/documents').then(({ items = [] }) => { state.allDocuments = items; });
       dom.documentCount.textContent = String(state.allDocuments.length);
+      renderKnowledgeDocuments(state.allDocuments);
       await loadSettings();
       await refreshBrainLab();
     } else {
@@ -467,6 +485,19 @@ function attachEvents() {
     if (!button) return;
     state.selectedDocuments.splice(Number(button.dataset.removeDocument), 1);
     renderAttachments();
+  });
+  dom.knowledgeDocumentList.addEventListener('click', async (event) => {
+    const button = event.target.closest('[data-delete-document]');
+    if (!button) return;
+    try {
+      await api(`/documents/${encodeURIComponent(button.dataset.deleteDocument)}`, { method: 'DELETE' });
+      state.allDocuments = (state.allDocuments || []).filter((item) => item.id !== button.dataset.deleteDocument);
+      state.selectedDocuments = state.selectedDocuments.filter((item) => item.id !== button.dataset.deleteDocument);
+      renderKnowledgeDocuments(state.allDocuments);
+      renderAttachments();
+      dom.documentCount.textContent = String(state.allDocuments.length);
+      showToast('Document deleted from the knowledge library.');
+    } catch (error) { showToast(`Document was not deleted: ${error.message}`); }
   });
   document.addEventListener('click', (event) => {
     const promptButton = event.target.closest('[data-prompt]');
