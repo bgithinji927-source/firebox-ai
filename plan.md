@@ -28,7 +28,7 @@ Monochrome neo-industrial editorial: a quiet, high-contrast interface that combi
 
 ### Color philosophy
 
-Use only black, white, and a restrained grayscale ladder. Black communicates capability and control; white creates a clear working canvas; gray is reserved for metadata and boundaries. No purple, blue, green, or other accent hues are used.
+Use only near-black, charcoal, white, and a restrained grayscale ladder. The dark canvas reduces visual noise and makes white typography feel decisive; softer grays are reserved for metadata and boundaries. No purple, blue, green, or other accent hues are used.
 
 ### Layout paradigm
 
@@ -38,7 +38,7 @@ Use a left command rail plus an offset main workspace. The sidebar is a persiste
 
 - FIREBOX icon: a geometric flame core inside a rounded box.
 - Thin ruled dividers and monospaced system labels.
-- Black command surfaces with inverted white type for decisive actions.
+- Charcoal command surfaces with white type, echoing a focused ChatGPT-style workspace.
 
 ### Interaction philosophy
 
@@ -71,7 +71,7 @@ Use the FIREBOX mark as a geometric flame-in-box icon next to a two-line wordmar
 
 ### Signature brand color
 
-The ownable brand color for this requested version is **ink black** (`#050505`) against a white working field. The identity is intentionally built from contrast rather than hue.
+The ownable brand color for this requested version is **ink black** (`#050505`) paired with charcoal surfaces and white type. The identity is intentionally built from contrast rather than hue.
 
 ## Project structure
 
