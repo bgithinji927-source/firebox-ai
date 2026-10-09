@@ -73,3 +73,22 @@ body, :root { background: #000; }
 .syntax-string { color: #c3e88d; }
 .syntax-comment { color: #71808a; font-style: italic; }
 .syntax-number { color: #f78c6c; }
+
+/* Mobile viewport fix: keep the composer above browser chrome and safe-area insets. */
+@supports (height: 100dvh) {
+  .chat-app { min-height: 100dvh; }
+}
+@media (max-width: 600px) {
+  .chat-app { min-height: 100svh; }
+  .chat-header { flex: 0 0 70px; }
+  .conversation { height: calc(100svh - 70px); min-height: 0; padding-bottom: calc(10px + env(safe-area-inset-bottom)); }
+  .composer { width: 100%; flex: 0 0 auto; margin-bottom: 0; }
+  .composer textarea { min-width: 0; }
+  .messages { min-height: 0; padding-bottom: 18px; }
+}
+@media (max-width: 600px) and (min-height: 500px) {
+  @supports (height: 100dvh) {
+    .chat-app { min-height: 100dvh; }
+    .conversation { height: calc(100dvh - 70px); }
+  }
+}
