@@ -27,16 +27,20 @@
         </button>
 
         <nav class="primary-nav" aria-label="Primary">
-          <a class="nav-item is-active" href="#chat" aria-current="page">
+          <a class="nav-item is-active" href="#chat" data-panel-target="chat" aria-current="page">
             <span class="nav-icon" aria-hidden="true">⌁</span>
             <span>Assistant</span>
           </a>
-          <a class="nav-item" href="#chat" data-toast="The standalone library view is unavailable; attach a document to process and retrieve it.">
+          <a class="nav-item" href="#knowledgeLibrary" data-panel-target="knowledgeLibrary">
             <span class="nav-icon" aria-hidden="true">▤</span>
             <span>Knowledge library</span>
             <span class="nav-count" id="documentCount">0</span>
           </a>
-          <a class="nav-item" href="#brainLab">
+          <a class="nav-item" href="#activity" data-panel-target="activity">
+            <span class="nav-icon" aria-hidden="true">◷</span>
+            <span>Activity</span>
+          </a>
+          <a class="nav-item" href="#brainLab" data-panel-target="brainLab">
             <span class="nav-icon" aria-hidden="true">⌬</span>
             <span>Brain Lab</span>
             <span class="nav-count">LOCAL</span>
@@ -71,8 +75,8 @@
           <div class="topbar-left">
             <button class="icon-button menu-button" id="menuButton" type="button" aria-label="Open navigation">☰</button>
             <div class="workspace-context">
-              <span class="eyebrow">FIREBOX AI WORKSPACE</span>
-              <h1>Technical assistant</h1>
+              <span class="eyebrow">FIREBOX LOCAL TRAINING WORKSPACE</span>
+              <h1>FIREBOX Brain Workspace</h1>
             </div>
           </div>
           <div class="topbar-actions">
@@ -167,7 +171,7 @@
               <div class="status-line status-line-muted"><span class="status-pending">—</span><span><strong id="modelStatus">FIREBOX model</strong><small id="modelDetail">Local checkpoint status</small></span></div>
             </section>
 
-            <section class="utility-card source-card">
+            <section class="utility-card source-card" id="knowledgeLibrary">
               <div class="utility-card-heading"><span class="eyebrow">SOURCE LAYERS</span><button class="icon-button small" type="button" aria-label="Source layer information" data-toast="Source layers keep model, document, and web context distinct.">i</button></div>
               <div class="source-layer"><span class="layer-symbol">M</span><div><strong>FIREBOX model</strong><small>Local trainable checkpoint</small></div><span class="layer-state is-off"></span></div>
               <div class="source-layer"><span class="layer-symbol">D</span><div><strong>Documents</strong><small>PDF/text extraction and retrieval</small></div><span class="layer-state is-off"></span></div>
@@ -184,7 +188,7 @@
               </div>
               <button class="lab-button" id="trainingGuideButton" type="button">Open training guide <span>↗</span></button>
             </section>
-            <section class="utility-card recent-card">
+            <section class="utility-card recent-card" id="activity">
               <div class="utility-card-heading"><span class="eyebrow">RECENT SOURCES</span><span class="source-count" id="sourceCount">0</span></div>
               <div id="recentSources" class="empty-source"><span class="empty-source-mark">⌁</span><strong>No sources yet</strong><small>Sources from completed answers appear here.</small></div>
             </section>

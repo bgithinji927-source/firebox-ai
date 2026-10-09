@@ -409,3 +409,23 @@ body { font-size: 16px; }
 .brain-state small, .brain-stats small { font-size: 11px; }
 .lab-button { font-size: 12px; }
 .citation, .feedback-row, .feedback-row button { font-size: 11px; }
+
+/* Fixed workspace shell: the page stays in the viewport while inner work areas scroll. */
+html, body { height: 100%; overflow: hidden; }
+.app-shell, .main-shell { height: 100vh; min-height: 0; }
+.sidebar { max-height: 100vh; overflow-y: auto; }
+.main-shell { overflow: hidden; }
+.workspace-body { min-height: 0; overflow: hidden; }
+.chat-panel { min-height: 0; overflow: hidden; }
+.chat-scroll { min-height: 0; }
+.utility-rail { min-height: 0; max-height: 100%; overflow-y: auto; scrollbar-width: thin; }
+#knowledgeLibrary, #activity, #brainLab { scroll-margin-top: 24px; }
+
+@media (max-width: 820px) {
+  html, body { overflow: auto; }
+  .app-shell, .main-shell { height: auto; min-height: 100vh; }
+  .main-shell { overflow: visible; }
+  .workspace-body { overflow: visible; }
+  .chat-panel { min-height: calc(100vh - 120px); overflow: visible; }
+  .utility-rail { max-height: none; overflow: visible; }
+}

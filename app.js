@@ -402,6 +402,19 @@ async function saveSettings(patch) {
 function attachEvents() {
   dom.menuButton.addEventListener('click', () => setSidebar(true));
   dom.sidebarScrim.addEventListener('click', () => setSidebar(false));
+  document.querySelectorAll('.nav-item[data-panel-target]').forEach((item) => {
+    item.addEventListener('click', (event) => {
+      event.preventDefault();
+      const target = document.getElementById(item.dataset.panelTarget);
+      if (!target) return;
+      document.querySelectorAll('.nav-item').forEach((nav) => nav.classList.remove('is-active'));
+      item.classList.add('is-active');
+      item.setAttribute('aria-current', 'page');
+      document.querySelectorAll('.nav-item').forEach((nav) => { if (nav !== item) nav.removeAttribute('aria-current'); });
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      setSidebar(false);
+    });
+  });
   dom.newChatButton.addEventListener('click', createNewChat);
   dom.renameConversationButton?.addEventListener('click', renameCurrentConversation);
   dom.deleteConversationButton?.addEventListener('click', deleteCurrentConversation);
