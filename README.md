@@ -8,7 +8,8 @@ A single-workspace technical AI assistant for programming, cybersecurity, techni
 
 - FastAPI serves the UI and backend from one Railway-compatible Docker service.
 - MongoDB stores conversations, messages, settings, document metadata, and extracted document chunks.
-- Chat requests use the locally trained FIREBOX model checkpoint. No OpenAI, Ollama, or other external model provider is used.
+- Chat requests start with the locally trained FIREBOX model checkpoint. No external model provider is required; Groq supervision is optional when `GROQ_API_KEY` is configured.
+- When `GROQ_API_KEY` is configured, an optional Groq teacher reviews the local draft against retrieved evidence and rewrites it into a clear answer; local and extractive fallbacks remain available if Groq is unavailable.
 - PDF and supported text files are validated, extracted, chunked, indexed in MongoDB, and made available for lexical retrieval. Retrieved passages include document and page references where available.
 - Optional web search uses Tavily for current source discovery only; it is not an AI model and is never used to generate answers.
 - Server-side HTTP Basic Authentication protects the UI and API. `/api/health` is public and reports service readiness without exposing credentials.
@@ -41,10 +42,15 @@ Keep secrets only in the backend environment; never put them in frontend code or
 | `APP_PASSWORD` | Yes | Strong, unique password for the workspace |
 | `FIREBOX_CHECKPOINT` | Yes for chat | Path to a checkpoint created by the local training command |
 | `TAVILY_API_KEY` | Optional | Enables web search when the user toggles it on |
+| `GROQ_API_KEY` | Optional | Enables the real-time Groq teacher/supervisor |
+| `GROQ_MODEL` | No | Groq model ID; defaults to `openai/gpt-oss-20b` |
+| `GROQ_TIMEOUT_SECONDS` | No | Teacher request timeout; defaults to `20` |
 | `STORAGE_DIR` | Yes for durable uploads | Upload path; attach a Railway Volume at `/app/storage` |
 | `FIREBOX_OWNER_ID` | No | Fixed workspace owner identifier |
 
 Without MongoDB or a trained local checkpoint, the app reports degraded/unavailable status and does not claim data was saved or an answer was generated. Web search stays unavailable until `TAVILY_API_KEY` is configured.
+
+The Groq teacher is optional. Add `GROQ_API_KEY` as a secret Railway variable to enable it. It receives the user question, the local FIREBOX draft, and retrieved document passages; it is instructed to cite only those passages and to say when evidence is insufficient. The key is never sent to the browser.
 
 ## Deploy to Railway
 

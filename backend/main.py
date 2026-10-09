@@ -28,6 +28,7 @@ from .db import MongoStore, mongo_error_message
 from .model_adapter import FireboxModelAdapter, ModelUnavailable
 from .repositories import Repositories
 from .schemas import ConversationCreate, MessageCreate, SettingsUpdate
+from .teacher_supervisor import GroqTeacher
 
 ROOT = Path(__file__).resolve().parents[1]
 load_dotenv(ROOT / ".env")
@@ -36,6 +37,7 @@ logger = logging.getLogger("firebox.api")
 store = MongoStore.from_environment()
 repositories = Repositories(store)
 model_adapter = FireboxModelAdapter()
+teacher = GroqTeacher()
 MAX_UPLOAD_BYTES = 25 * 1024 * 1024
 ALLOWED_EXTENSIONS = {".pdf", ".txt", ".md", ".csv", ".json", ".py", ".js", ".ts"}
 
@@ -296,6 +298,10 @@ async def chat(payload: ChatRequest, x_owner_id: str | None = Header(default=Non
         answer = await model_adapter.chat(context, payload.model)
         if sources and answer_is_unusable(answer, prompt, sources):
             answer = extractive_answer(sources)
+        if teacher.configured:
+            supervised = await teacher.review(prompt, answer, sources)
+            if supervised:
+                answer = supervised
     except ModelUnavailable as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     return {"answer": answer, "conversation_id": payload.conversation_id, "model": payload.model or model_adapter.model_name, "sources": sources}
@@ -447,7 +453,7 @@ def delete_document(document_id: str, x_owner_id: str | None = Header(default=No
 
 @app.get("/api/learning/status")
 def learning_status() -> dict[str, Any]:
-    return {"model": model_adapter.status(), "database": store.status(), "external_models": False}
+    return {"model": model_adapter.status(), "database": store.status(), "teacher": teacher.status(), "external_models": teacher.configured}
 
 
 @app.get("/api/learning/feedback")
