@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 from datetime import datetime, timezone
 from typing import Any
 
@@ -98,10 +97,10 @@ class Repositories:
 
     def get_settings(self, owner_id: str) -> dict[str, Any]:
         item = self.store.collection("settings").find_one({"owner_id": owner_id})
-        return serialise(item or {"owner_id": owner_id, "model_name": os.getenv("MODEL_NAME", ""), "web_search_enabled": False})
+        return serialise(item or {"owner_id": owner_id, "runtime": "local-firebox", "web_search_enabled": False})
 
     def update_settings(self, owner_id: str, values: dict[str, Any]) -> dict[str, Any]:
-        allowed = {key: value for key, value in values.items() if key in {"model_name", "web_search_enabled"}}
+        allowed = {key: value for key, value in values.items() if key in {"web_search_enabled"}}
         allowed["owner_id"] = owner_id
         allowed["updated_at"] = utc_now()
         self.store.collection("settings").update_one({"owner_id": owner_id}, {"$set": allowed, "$setOnInsert": {"created_at": utc_now()}}, upsert=True)
@@ -131,3 +130,28 @@ class Repositories:
             return None
         self.store.collection("document_chunks").delete_many({"document_id": document_id, "owner_id": owner_id})
         return serialise(document)
+
+    def insert_training_record(self, collection: str, owner_id: str, values: dict[str, Any]) -> dict[str, Any]:
+        document = {"owner_id": owner_id, "created_at": utc_now(), **values}
+        result = self.store.collection(collection).insert_one(document)
+        document["id"] = str(result.inserted_id)
+        return serialise(document)
+
+    def list_training_records(self, collection: str, owner_id: str, limit: int = 100) -> list[dict[str, Any]]:
+        cursor = self.store.collection(collection).find({"owner_id": owner_id}).sort("created_at", -1).limit(limit)
+        return [serialise({**item, "id": item["_id"]}) for item in cursor]
+
+    def append_training_metric(self, owner_id: str, run_id: str, values: dict[str, Any]) -> dict[str, Any]:
+        return self.insert_training_record("training_metrics", owner_id, {"run_id": run_id, **values})
+
+    def add_knowledge_item(self, owner_id: str, values: dict[str, Any]) -> dict[str, Any]:
+        return self.insert_training_record("knowledge_items", owner_id, {"approved": False, **values})
+
+    def approve_knowledge_item(self, owner_id: str, item_id: str) -> bool:
+        if not ObjectId.is_valid(item_id):
+            return False
+        result = self.store.collection("knowledge_items").update_one(
+            {"_id": ObjectId(item_id), "owner_id": owner_id},
+            {"$set": {"approved": True, "approved_at": utc_now()}},
+        )
+        return result.modified_count == 1

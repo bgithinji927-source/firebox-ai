@@ -77,8 +77,8 @@
           <div class="topbar-actions">
             <label class="model-control" for="modelSelect">
               <span class="model-led"></span>
-              <select id="modelSelect" aria-label="Select model">
-                <option value="">Server-configured model</option>
+              <select id="modelSelect" aria-label="Active model" disabled>
+                <option value="local-firebox">FIREBOX local model</option>
               </select>
             </label>
             <button class="search-toggle" id="searchToggle" type="button" aria-pressed="false">
@@ -163,12 +163,12 @@
               <div class="utility-card-heading"><span class="eyebrow">SERVICE STATUS</span><span class="live-chip" id="serviceChip"><span></span> CHECKING</span></div>
               <div class="status-line status-line-muted"><span class="status-pending">—</span><span><strong id="databaseStatus">Database</strong><small id="databaseDetail">Waiting for backend health check</small></span></div>
               <div class="status-line status-line-muted"><span class="status-pending">—</span><span><strong id="memoryStatus">Conversation memory</strong><small id="memoryDetail">Requires MongoDB connection</small></span></div>
-              <div class="status-line status-line-muted"><span class="status-pending">—</span><span><strong id="modelStatus">Model endpoint</strong><small id="modelDetail">Requires server-side model configuration</small></span></div>
+              <div class="status-line status-line-muted"><span class="status-pending">—</span><span><strong id="modelStatus">FIREBOX model</strong><small id="modelDetail">Local checkpoint status</small></span></div>
             </section>
 
             <section class="utility-card source-card">
               <div class="utility-card-heading"><span class="eyebrow">SOURCE LAYERS</span><button class="icon-button small" type="button" aria-label="Source layer information" data-toast="Source layers keep model, document, and web context distinct.">i</button></div>
-              <div class="source-layer"><span class="layer-symbol">M</span><div><strong>Language model</strong><small>Server-configured provider</small></div><span class="layer-state is-off"></span></div>
+              <div class="source-layer"><span class="layer-symbol">M</span><div><strong>FIREBOX model</strong><small>Local trainable checkpoint</small></div><span class="layer-state is-off"></span></div>
               <div class="source-layer"><span class="layer-symbol">D</span><div><strong>Documents</strong><small>PDF/text extraction and retrieval</small></div><span class="layer-state is-off"></span></div>
               <div class="source-layer"><span class="layer-symbol">W</span><div><strong>Web research</strong><small>Requires a configured search key</small></div><span class="layer-state is-off"></span></div>
             </section>

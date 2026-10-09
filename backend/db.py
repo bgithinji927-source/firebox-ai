@@ -91,6 +91,13 @@ class MongoStore:
         self.database.document_chunks.create_index([("document_id", ASCENDING), ("chunk_index", ASCENDING)])
         self.database.document_chunks.create_index([("owner_id", ASCENDING), ("document_id", ASCENDING)])
         self.database.web_research_cache.create_index("expires_at", expireAfterSeconds=0)
+        self.database.training_runs.create_index([("owner_id", ASCENDING), ("created_at", DESCENDING)])
+        self.database.training_metrics.create_index([("run_id", ASCENDING), ("epoch", ASCENDING)])
+        self.database.training_feedback.create_index([("owner_id", ASCENDING), ("created_at", DESCENDING)])
+        self.database.training_lessons.create_index([("owner_id", ASCENDING), ("topic", ASCENDING)])
+        self.database.evaluation_cases.create_index([("owner_id", ASCENDING), ("category", ASCENDING)])
+        self.database.evaluation_results.create_index([("run_id", ASCENDING), ("created_at", DESCENDING)])
+        self.database.knowledge_items.create_index([("owner_id", ASCENDING), ("approved", ASCENDING)])
 
 
 def mongo_error_message(exc: Exception) -> str:

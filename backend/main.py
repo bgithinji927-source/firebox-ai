@@ -25,7 +25,7 @@ from pypdf import PdfReader
 from pypdf.errors import PdfReadError
 
 from .db import MongoStore, mongo_error_message
-from .model_adapter import ModelUnavailable, OllamaAdapter
+from .model_adapter import FireboxModelAdapter, ModelUnavailable
 from .repositories import Repositories
 from .schemas import ConversationCreate, MessageCreate, SettingsUpdate
 
@@ -35,7 +35,7 @@ logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
 logger = logging.getLogger("firebox.api")
 store = MongoStore.from_environment()
 repositories = Repositories(store)
-model_adapter = OllamaAdapter()
+model_adapter = FireboxModelAdapter()
 MAX_UPLOAD_BYTES = 25 * 1024 * 1024
 ALLOWED_EXTENSIONS = {".pdf", ".txt", ".md", ".csv", ".json", ".py", ".js", ".ts"}
 
@@ -92,6 +92,33 @@ class ChatRequest(BaseModel):
     webSearch: bool = False
     conversation_id: str | None = None
     document_ids: list[str] = Field(default_factory=list, max_length=50)
+
+
+class FeedbackRequest(BaseModel):
+    prompt: str = Field(min_length=1, max_length=100_000)
+    response: str = Field(min_length=1, max_length=100_000)
+    rating: str = Field(pattern="^(good|incorrect|needs_detail|unsafe|good_code|bad_code|citation_correct|citation_incorrect)$")
+    correction: str = Field(default="", max_length=100_000)
+    source_ids: list[str] = Field(default_factory=list, max_length=50)
+
+
+class LessonRequest(BaseModel):
+    topic: str = Field(min_length=1, max_length=200)
+    question: str = Field(min_length=1, max_length=20_000)
+    expected_answer: str = Field(min_length=1, max_length=50_000)
+    explanation: str = Field(default="", max_length=50_000)
+    difficulty: str = Field(default="beginner", max_length=40)
+
+
+class KnowledgeRequest(BaseModel):
+    subject: str = Field(min_length=1, max_length=200)
+    fact: str = Field(min_length=1, max_length=20_000)
+    source: str = Field(default="owner", max_length=500)
+
+
+class ToolRequest(BaseModel):
+    tool: str = Field(pattern="^(python_syntax|json_validate|calculator)$")
+    input: str = Field(min_length=1, max_length=20_000)
 
 
 def owner_id(_: str | None = None) -> str:
@@ -390,6 +417,99 @@ def delete_document(document_id: str, x_owner_id: str | None = Header(default=No
     except Exception as exc:
         logger.exception("Document deletion failed")
         raise HTTPException(status_code=503, detail=mongo_error_message(exc)) from exc
+
+
+@app.get("/api/learning/status")
+def learning_status() -> dict[str, Any]:
+    return {"model": model_adapter.status(), "database": store.status(), "external_models": False}
+
+
+@app.get("/api/learning/feedback")
+def list_feedback(x_owner_id: str | None = Header(default=None)) -> dict[str, Any]:
+    return {"items": require_database().list_training_records("training_feedback", owner_id(x_owner_id))}
+
+
+@app.post("/api/learning/feedback", status_code=201)
+def add_feedback(payload: FeedbackRequest, x_owner_id: str | None = Header(default=None)) -> dict[str, Any]:
+    return require_database().insert_training_record("training_feedback", owner_id(x_owner_id), payload.model_dump())
+
+
+@app.get("/api/learning/lessons")
+def list_lessons(x_owner_id: str | None = Header(default=None)) -> dict[str, Any]:
+    return {"items": require_database().list_training_records("training_lessons", owner_id(x_owner_id))}
+
+
+@app.post("/api/learning/lessons", status_code=201)
+def add_lesson(payload: LessonRequest, x_owner_id: str | None = Header(default=None)) -> dict[str, Any]:
+    return require_database().insert_training_record("training_lessons", owner_id(x_owner_id), payload.model_dump())
+
+
+@app.get("/api/learning/knowledge")
+def list_knowledge(x_owner_id: str | None = Header(default=None)) -> dict[str, Any]:
+    return {"items": require_database().list_training_records("knowledge_items", owner_id(x_owner_id))}
+
+
+@app.post("/api/learning/knowledge", status_code=201)
+def add_knowledge(payload: KnowledgeRequest, x_owner_id: str | None = Header(default=None)) -> dict[str, Any]:
+    return require_database().add_knowledge_item(owner_id(x_owner_id), payload.model_dump())
+
+
+@app.post("/api/learning/knowledge/{item_id}/approve")
+def approve_knowledge(item_id: str, x_owner_id: str | None = Header(default=None)) -> dict[str, Any]:
+    if not require_database().approve_knowledge_item(owner_id(x_owner_id), item_id):
+        raise HTTPException(status_code=404, detail="Knowledge item not found")
+    return {"approved": True, "id": item_id}
+
+
+@app.get("/api/learning/runs")
+def list_training_runs(x_owner_id: str | None = Header(default=None)) -> dict[str, Any]:
+    repo = require_database()
+    runs = repo.list_training_records("training_runs", owner_id(x_owner_id))
+    for run in runs:
+        run["metrics"] = repo.list_training_records("training_metrics", owner_id(x_owner_id))
+        run["metrics"] = [metric for metric in run["metrics"] if metric.get("run_id") == run["id"]]
+    return {"items": runs}
+
+
+@app.post("/api/tools/verify")
+def verify_tool(payload: ToolRequest) -> dict[str, Any]:
+    """Run only bounded, non-executing local checks; never execute user code."""
+    import ast
+    import json
+    import operator
+
+    if payload.tool == "python_syntax":
+        try:
+            ast.parse(payload.input)
+            return {"valid": True, "message": "Python syntax is valid. No code was executed."}
+        except SyntaxError as exc:
+            return {"valid": False, "message": f"Syntax error on line {exc.lineno}: {exc.msg}"}
+    if payload.tool == "json_validate":
+        try:
+            json.loads(payload.input)
+            return {"valid": True, "message": "JSON is valid."}
+        except json.JSONDecodeError as exc:
+            return {"valid": False, "message": f"JSON error at character {exc.pos}: {exc.msg}"}
+    try:
+        allowed = {ast.Add: operator.add, ast.Sub: operator.sub, ast.Mult: operator.mul, ast.Div: operator.truediv, ast.Pow: operator.pow, ast.USub: operator.neg}
+        tree = ast.parse(payload.input, mode="eval")
+        def calculate(node):
+            if isinstance(node, ast.Constant) and isinstance(node.value, (int, float)):
+                return node.value
+            if isinstance(node, ast.UnaryOp) and type(node.op) in allowed:
+                return allowed[type(node.op)](calculate(node.operand))
+            if isinstance(node, ast.BinOp) and type(node.op) in allowed:
+                left, right = calculate(node.left), calculate(node.right)
+                if type(node.op) is ast.Pow and abs(right) > 12:
+                    raise ValueError("Exponent is too large")
+                return allowed[type(node.op)](left, right)
+            raise ValueError("Only numbers and basic arithmetic are allowed")
+        result = calculate(tree.body)
+        if abs(result) > 10**12:
+            raise ValueError("Result is too large")
+        return {"valid": True, "result": result, "message": "Calculated locally."}
+    except (ValueError, ZeroDivisionError, SyntaxError) as exc:
+        return {"valid": False, "message": str(exc)}
 
 
 @app.get("/api")

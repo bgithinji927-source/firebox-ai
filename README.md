@@ -8,13 +8,13 @@ A single-workspace technical AI assistant for programming, cybersecurity, techni
 
 - FastAPI serves the UI and backend from one Railway-compatible Docker service.
 - MongoDB stores conversations, messages, settings, document metadata, and extracted document chunks.
-- Chat requests use a configured OpenAI-compatible or Ollama-compatible model. No scripted fallback answers are returned.
+- Chat requests use the locally trained FIREBOX model checkpoint. No OpenAI, Ollama, or other external model provider is used.
 - PDF and supported text files are validated, extracted, chunked, indexed in MongoDB, and made available for lexical retrieval. Retrieved passages include document and page references where available.
-- Optional web search uses Tavily and includes real result links. If a provider is not configured or fails, the request returns an explicit error rather than fabricated sources.
+- Optional web search uses Tavily for current source discovery only; it is not an AI model and is never used to generate answers.
 - Server-side HTTP Basic Authentication protects the UI and API. `/api/health` is public and reports service readiness without exposing credentials.
 - The single-workspace owner is fixed by `FIREBOX_OWNER_ID`; client-supplied owner headers are ignored.
 
-This is a protected **single-workspace deployment**, not a multi-user SaaS product. It does not yet include individual user accounts, streaming token output, vector embeddings, or a formal security review. Do not claim full production readiness until the required services are configured and integration checks are completed.
+This is a protected **single-workspace deployment**, not a multi-user SaaS product. It includes local lexical RAG, a small trainable CPU-friendly model, lessons, owner feedback, approved knowledge, evaluation metadata, and bounded local verification tools. It is not a ChatGPT-scale model and still requires a security review before public exposure.
 
 ## Run locally
 
@@ -23,8 +23,7 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env
-# Edit .env with valid MongoDB credentials, model configuration,
-# and a unique APP_USERNAME / APP_PASSWORD.
+# Edit .env with valid MongoDB credentials and a unique APP_USERNAME / APP_PASSWORD.
 uvicorn backend.main:app --host 0.0.0.0 --port 3000
 ```
 
@@ -40,26 +39,33 @@ Keep secrets only in the backend environment; never put them in frontend code or
 | `MONGODB_DB_NAME` | No | Database name; defaults to `firebox_ai` |
 | `APP_USERNAME` | Yes | Username for the single-workspace Basic Auth gate |
 | `APP_PASSWORD` | Yes | Strong, unique password for the workspace |
-| `MODEL_PROVIDER` | Yes for chat | `openai` or `ollama` |
-| `MODEL_BASE_URL` | Yes for chat | Provider base URL; for OpenAI use `https://api.openai.com/v1` |
-| `MODEL_NAME` | Yes for chat | Exact model identifier supported by the provider |
-| `MODEL_API_KEY` | OpenAI | Provider API key; not used by Ollama mode |
+| `FIREBOX_CHECKPOINT` | Yes for chat | Path to a checkpoint created by the local training command |
 | `TAVILY_API_KEY` | Optional | Enables web search when the user toggles it on |
 | `STORAGE_DIR` | Yes for durable uploads | Upload path; attach a Railway Volume at `/app/storage` |
 | `FIREBOX_OWNER_ID` | No | Fixed workspace owner identifier |
 
-Without MongoDB or model configuration, the app reports degraded/unavailable status and does not claim data was saved or an answer was generated. Web search stays unavailable until `TAVILY_API_KEY` is configured.
+Without MongoDB or a trained local checkpoint, the app reports degraded/unavailable status and does not claim data was saved or an answer was generated. Web search stays unavailable until `TAVILY_API_KEY` is configured.
 
 ## Deploy to Railway
 
 1. Push this repository to GitHub and create a Railway project using **Deploy from GitHub repo**.
 2. Railway will build the included `Dockerfile`; the container binds to `0.0.0.0:$PORT`.
-3. Add the environment variables above in the Railway service's Variables tab. Use fresh, unique values for `APP_USERNAME` and `APP_PASSWORD`; add provider credentials in Railway, not in this repository.
+3. Add the environment variables above in the Railway service's Variables tab. Use fresh, unique values for `APP_USERNAME` and `APP_PASSWORD`.
 4. Connect MongoDB (for example, MongoDB Atlas) and set `MONGODB_URI` and `MONGODB_DB_NAME`.
-5. Attach a Railway Volume mounted at `/app/storage` so uploaded original files survive container restarts and redeploys.
-6. Generate a Railway public domain only after the access password and data-provider configuration are set. Check `/api/health`; verify chat, MongoDB persistence, document processing, and web search separately.
+5. Attach a Railway Volume mounted at `/app/storage`, then train or copy a checkpoint to `/app/storage/checkpoints/latest.pt`.
+6. Generate a Railway public domain only after the access password and MongoDB configuration are set. Check `/api/health`; verify local inference, MongoDB persistence, document processing, and web search separately.
 
-Railway environment variables are not included in this repository. The deployment is not fully functional until the required external service values are configured.
+Railway environment variables are not included in this repository. The deployment is not fully functional until MongoDB and a local FIREBOX checkpoint are configured.
+
+## Train FIREBOX locally
+
+The repository contains a deliberately small CPU-friendly GRU language model. It is a real trainable local model, not a scripted answer generator and not a wrapper around an external model. Start with the smoke-test corpus, then replace it with legally usable technical examples:
+
+```bash
+python training/train_firebox.py --data training_data/starter.jsonl --checkpoint storage/checkpoints/latest.pt --epochs 8
+```
+
+For Railway, run training in a separate worker/job and save the checkpoint on the persistent `/app/storage` volume. MongoDB stores conversations, document chunks, feedback, lessons, knowledge, and training metadata; it does not store large tensor files.
 
 ## API surface
 
@@ -71,7 +77,9 @@ Railway environment variables are not included in this repository. The deploymen
 - `GET /api/documents` — list processed documents
 - `POST /api/documents/upload` — validate, extract, chunk, and index supported files
 - `DELETE /api/documents/{id}` — delete a document, its chunks, and its stored file
-- `POST /api/chat` — call the configured model with conversation context and retrieved evidence
+- `POST /api/chat` — call the local FIREBOX checkpoint with conversation context and retrieved evidence
+- `/api/learning/*` — feedback, lessons, approved knowledge, and training-run metadata
+- `POST /api/tools/verify` — safe local Python syntax, JSON, and arithmetic checks; never executes user code
 
 ## Tests
 
@@ -81,7 +89,7 @@ python -m compileall -q backend
 node --check app.js
 ```
 
-The included unit tests cover text extraction, page-aware chunking, and ignoring caller-controlled owner IDs. Integration tests still require a reachable MongoDB, model provider, and (for web search) Tavily credentials.
+The included unit tests cover text extraction, page-aware chunking, and ignoring caller-controlled owner IDs. Integration tests require MongoDB, a trained local checkpoint, and (for web search) Tavily credentials.
 
 ## Project layout
 
@@ -89,7 +97,10 @@ The included unit tests cover text extraction, page-aware chunking, and ignoring
 backend/main.py          FastAPI routes, auth gate, uploads, retrieval, search
 backend/db.py            MongoDB connection and indexes
 backend/repositories.py  Persistence operations
-backend/model_adapter.py OpenAI-compatible / Ollama model client
+backend/model_adapter.py Local FIREBOX checkpoint adapter
+backend/firebox_model/   Tokenizer, model, runtime, and training utilities
+training/                 Local training entry point
+training_data/            Starter JSONL corpus and dataset guidance
 app.js                   Frontend interactions and API synchronization
 index.html / styles.css  FIREBOX AI interface
 Dockerfile               Railway container runtime

@@ -16,5 +16,4 @@ class MessageCreate(BaseModel):
 
 
 class SettingsUpdate(BaseModel):
-    model_name: str | None = Field(default=None, max_length=120)
     web_search_enabled: bool | None = None

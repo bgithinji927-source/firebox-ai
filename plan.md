@@ -7,7 +7,7 @@ Maintain a responsive FIREBOX AI workspace with a Python/FastAPI backend and Mon
 ## Implementation approach
 
 - Use semantic HTML, plain CSS, and vanilla JavaScript so a beginner can read and maintain the project without a build framework.
-- Use FastAPI and Pydantic for the API, PyMongo for MongoDB access, and configurable OpenAI-compatible or Ollama-compatible model adapters.
+- Use FastAPI and Pydantic for the API, PyMongo for MongoDB access, and a small local FIREBOX model adapter. No external model provider is required.
 - Keep MongoDB collections and persistence operations in `backend/repositories.py`; keep connection and index management in `backend/db.py`.
 - Store original uploads in configured file storage and persist document metadata, extracted chunks, and processing status in MongoDB.
 - Serve the frontend and API from one Railway-compatible container using the assigned `PORT`.
@@ -15,6 +15,7 @@ Maintain a responsive FIREBOX AI workspace with a Python/FastAPI backend and Mon
 - Keep the route manifest at `public/manus-routes.json`.
 - Use `app.js` for UI state: persisted conversation switching, composing/sending messages, file processing, model/search settings, citations, regeneration, best-effort cancellation, and mobile sidebar behavior.
 - Keep explicit `/api/chat`, conversation, settings, and document endpoints; when MongoDB or a provider is unavailable, return a meaningful error rather than fabricated output.
+- Keep training and evaluation as a separate local worker path: tokenizer, small CPU-compatible model, approved lessons/feedback, checkpoints, metrics, and evaluations.
 - Protect the single-workspace app with server-side credentials; never trust client-supplied owner IDs.
 
 ## Design direction

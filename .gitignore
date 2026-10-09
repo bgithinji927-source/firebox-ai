@@ -8,3 +8,5 @@ venv/
 storage/uploads/
 .pytest_cache/
 .DS_Store
+storage/checkpoints/
+storage/datasets/

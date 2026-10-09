@@ -333,7 +333,7 @@ async function syncBackendStatus() {
     dom.memoryStatus.textContent = state.backendReady ? 'Conversation persistence' : 'Conversation memory';
     dom.memoryDetail.textContent = state.backendReady ? 'Saved messages are available' : 'Requires MongoDB connection';
     dom.modelStatus.textContent = state.modelConfigured ? 'Model configured' : 'Model unavailable';
-    dom.modelDetail.textContent = state.modelConfigured ? `${health.model.provider} · ${health.model.model_configured ? 'model selected' : 'model missing'}` : 'Check model provider settings';
+    dom.modelDetail.textContent = state.modelConfigured ? `${health.model.provider} · checkpoint loaded` : (health.model?.error || 'Train a local checkpoint first');
     if (state.backendReady) {
       statusStrong.textContent = state.modelConfigured ? 'Services connected' : 'Database connected';
       statusSmall.textContent = state.modelConfigured ? 'Persistence and model available' : 'Model configuration required';
@@ -361,14 +361,6 @@ async function syncBackendStatus() {
 
 async function loadSettings() {
   const settings = await api('/settings');
-  if (settings.model_name) {
-    const existing = Array.from(dom.modelSelect.options).find((option) => option.value === settings.model_name || option.textContent === settings.model_name);
-    if (existing) dom.modelSelect.value = existing.value;
-    else {
-      const option = new Option(settings.model_name, settings.model_name, true, true);
-      dom.modelSelect.add(option);
-    }
-  }
   state.webSearchEnabled = Boolean(settings.web_search_enabled);
   dom.searchToggle.setAttribute('aria-pressed', String(state.webSearchEnabled));
 }
@@ -391,7 +383,6 @@ function attachEvents() {
     dom.searchToggle.setAttribute('aria-pressed', String(state.webSearchEnabled));
     await saveSettings({ web_search_enabled: state.webSearchEnabled });
   });
-  dom.modelSelect.addEventListener('change', () => saveSettings({ model_name: dom.modelSelect.value }));
   dom.messageInput.addEventListener('input', autoResize);
   dom.messageInput.addEventListener('keydown', (event) => {
     if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') { event.preventDefault(); void submitPrompt(dom.messageInput.value); }
