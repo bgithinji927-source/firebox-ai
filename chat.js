@@ -115,7 +115,7 @@ function addMessage(role, content, sources = [], prompt = '') {
   if (role === 'user') {
     item.innerHTML = `<div class="bubble">${escapeHtml(content).replace(/\n/g, '<br>')}</div>`;
   } else {
-    item.innerHTML = `<div class="assistant-label">FIREBOX AI · RICH RESPONSE</div><div class="bubble"><div class="rich-content">${renderMarkdown(content)}</div>${generatedPanel(prompt, content)}${sourceCards(sources)}<div class="response-actions"><button class="response-action" type="button" data-copy-answer>Copy answer</button><button class="response-action" type="button" data-regenerate>Regenerate</button></div></div>`;
+    item.innerHTML = `<div class="assistant-label">FIREBOX AI · RICH RESPONSE</div><div class="bubble"><div class="rich-content">${renderMarkdown(content)}</div>${generatedPanel(prompt, content)}${sourceCards(sources)}<div class="response-actions"><button class="response-action icon-action" type="button" data-copy-answer aria-label="Copy answer" title="Copy answer"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="11" height="11" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg></button><button class="response-action icon-action" type="button" data-share-answer aria-label="Share answer" title="Share answer"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/><path d="m8.2 10.8 7.5-4.4m-7.5 6.8 7.5 4.4"/></svg></button><button class="response-action icon-action" type="button" data-regenerate aria-label="Regenerate answer" title="Regenerate answer"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14.9-4L3 10m0-4v4h4M4 13a8 8 0 0 0 14.9 4L21 14m0 4v-4h-4"/></svg></button></div></div>`;
     item.dataset.prompt = prompt;
   }
   messages.appendChild(item);
@@ -186,6 +186,13 @@ input.addEventListener('input', resizeInput);
 input.addEventListener('keydown', (event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void submit(input.value); } });
 document.querySelectorAll('[data-prompt]').forEach((button) => button.addEventListener('click', () => { if (button.dataset.scroll) $('#composer').scrollIntoView({ behavior: 'smooth', block: 'center' }); void submit(button.dataset.prompt); }));
 $('#newChat').addEventListener('click', () => { state.conversationId = null; state.documents = []; state.media = []; messages.querySelectorAll('.message').forEach((item) => item.remove()); welcome.classList.remove('is-hidden'); renderAttachments(); input.focus(); });
+$('#shareChat').addEventListener('click', async () => {
+  const shareData = { title: 'FIREBOX AI chat', text: 'Chat with FIREBOX AI', url: window.location.href };
+  try {
+    if (navigator.share) await navigator.share(shareData);
+    else { await navigator.clipboard.writeText(window.location.href); showToast('Chat link copied.'); }
+  } catch (error) { if (error.name !== 'AbortError') showToast('Chat sharing is unavailable.'); }
+});
 $('#searchButton').addEventListener('click', () => { state.webSearch = !state.webSearch; $('#searchButton').setAttribute('aria-pressed', String(state.webSearch)); showToast(state.webSearch ? 'Web search is on for the next answer.' : 'Web search is off.'); });
 $('#attachButton').addEventListener('click', () => $('#fileInput').click());
 $('#fileInput').addEventListener('change', async (event) => { for (const file of event.target.files) await uploadFile(file); event.target.value = ''; });
@@ -198,5 +205,11 @@ messages.addEventListener('click', async (event) => {
   if (copyCode) { await navigator.clipboard.writeText(window.__fireboxCode?.[copyCode.dataset.copyCode] || ''); showToast('Code copied.'); }
   if (verify) await verifyCode(verify.dataset.verifyCode, verify);
   if (copyAnswer) { const content = copyAnswer.closest('.bubble')?.querySelector('.rich-content')?.innerText || ''; await navigator.clipboard.writeText(content); showToast('Answer copied.'); }
+  const shareAnswer = event.target.closest('[data-share-answer]');
+  if (shareAnswer) {
+    const content = shareAnswer.closest('.bubble')?.querySelector('.rich-content')?.innerText || '';
+    try { if (navigator.share) await navigator.share({ title: 'FIREBOX AI answer', text: content, url: window.location.href }); else { await navigator.clipboard.writeText(content); showToast('Answer copied for sharing.'); } }
+    catch (error) { if (error.name !== 'AbortError') showToast('Answer sharing is unavailable.'); }
+  }
   if (regenerate) void submit(regenerate.closest('.message')?.dataset.prompt || state.lastPrompt);
 });
