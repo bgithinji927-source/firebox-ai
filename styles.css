@@ -497,7 +497,10 @@ html, body { height: 100%; overflow: hidden; }
 .library-hero strong { font-size: 18px; }
 .library-hero small { max-width: 620px; margin-top: 6px; color: var(--ink-muted); font-size: 14px; line-height: 1.45; }
 .library-upload { flex: 0 0 auto; padding: 11px 14px; border: 1px solid var(--ink); border-radius: 8px; background: var(--ink); color: var(--surface); cursor: pointer; font-size: 14px; font-weight: 700; }
-.knowledge-document-list { display: grid; gap: 8px; margin-bottom: 20px; }
+.knowledge-document-list { display: grid; gap: 8px; max-height: 260px; margin-bottom: 20px; overflow-y: auto; padding-right: 6px; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+.knowledge-document-list::-webkit-scrollbar { width: 7px; }
+.knowledge-document-list::-webkit-scrollbar-track { background: transparent; }
+.knowledge-document-list::-webkit-scrollbar-thumb { border-radius: 999px; background: var(--line); }
 .knowledge-empty { padding: 28px; border: 1px dashed var(--line); border-radius: 10px; color: var(--ink-muted); font-size: 15px; }
 .knowledge-document { display: flex; align-items: center; gap: 13px; padding: 13px; border: 1px solid var(--line); border-radius: 9px; }
 .document-file-icon { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 7px; background: var(--ink); color: var(--surface); font-family: "SFMono-Regular", Consolas, monospace; font-size: 11px; font-weight: 800; }
