@@ -582,6 +582,7 @@ def api_index() -> dict[str, Any]:
 
 
 @app.get("/chat", include_in_schema=False)
+@app.get("/chat/", include_in_schema=False)
 def user_chat() -> FileResponse:
     """Customer-facing chat page; the training dashboard remains at /."""
     return FileResponse(ROOT / "chat.html")
