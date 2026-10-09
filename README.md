@@ -1,3 +1,5 @@
+![FIREBOX AI icon](./firebox-ai-icon.svg)
+
 # FIREBOX AI
 
 A single-workspace technical AI assistant for programming, cybersecurity, technical learning, document-grounded answers, and practical problem solving.
