@@ -107,3 +107,10 @@ body, :root { background: #000; }
   .generated-card-scroller { margin-right: -10px; padding-right: 22px; }
   .generated-card { flex-basis: 78vw; min-height: 145px; }
 }
+
+.generated-card-check { display: flex; align-items: center; gap: 7px; margin-top: 18px; color: var(--soft); font-size: 11px; cursor: pointer; }
+.generated-card-check input { width: 16px; height: 16px; accent-color: var(--accent); }
+.generated-card-check input:checked + span { color: var(--accent); text-decoration: line-through; }
+.generated-card-send { margin-top: 18px; padding: 7px 10px; border: 1px solid #3d4d57; border-radius: 7px; background: #172128; color: var(--soft); font-size: 11px; cursor: pointer; }
+.generated-card-send:hover { border-color: var(--accent); color: var(--accent); }
+.generated-card.is-checklist:has(input:checked) { border-color: rgba(185,244,107,.55); opacity: .82; }

@@ -60,13 +60,18 @@ function highlightCode(code, language = '') {
   return html;
 }
 
-function renderCardRail(rows) {
+function renderCardRail(rows, mode = 'info') {
   const cards = rows.map((row) => {
     const separator = row.indexOf('|');
     const title = separator >= 0 ? row.slice(0, separator).trim() : row.trim();
     const description = separator >= 0 ? row.slice(separator + 1).trim() : '';
     if (!title) return '';
-    return `<article class="generated-card"><span class="generated-card-icon">✦</span><h3>${inlineMarkdown(title)}</h3>${description ? `<p>${inlineMarkdown(description)}</p>` : ''}</article>`;
+    const control = mode === 'checklist'
+      ? '<label class="generated-card-check"><input type="checkbox" aria-label="Mark complete" /><span>Done</span></label>'
+      : mode === 'suggestions'
+        ? `<button class="generated-card-send" type="button" data-send-suggestion="${escapeHtml(description ? `${title}: ${description}` : title)}" aria-label="Send suggestion">↑ Send</button>`
+        : '';
+    return `<article class="generated-card ${mode === 'checklist' ? 'is-checklist' : ''}"><span class="generated-card-icon">${mode === 'checklist' ? '☑' : mode === 'suggestions' ? '✦' : '✦'}</span><h3>${inlineMarkdown(title)}</h3>${description ? `<p>${inlineMarkdown(description)}</p>` : ''}${control}</article>`;
   }).filter(Boolean);
   if (!cards.length) return '';
   return `<section class="generated-card-rail" aria-label="Generated interface cards"><div class="generated-card-rail-label">Generated interface</div><div class="generated-card-scroller">${cards.join('')}</div></section>`;
@@ -81,14 +86,15 @@ function renderMarkdown(source) {
   let code = null;
   let quote = [];
   let cards = null;
+  let cardMode = 'info';
   const flushParagraph = () => { if (paragraph.length) { output.push(`<p>${inlineMarkdown(paragraph.join(' '))}</p>`); paragraph = []; } };
   const flushList = () => { if (!list.length) return; const tag = ordered ? 'ol' : 'ul'; output.push(`<${tag}>${list.map((item) => `<li>${inlineMarkdown(item)}</li>`).join('')}</${tag}>`); list = []; ordered = false; };
   const flushQuote = () => { if (quote.length) { output.push(`<blockquote>${quote.map((item) => inlineMarkdown(item)).join('<br>')}</blockquote>`); quote = []; } };
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index];
-    if (line.trim().toLowerCase() === ':::cards') { flushParagraph(); flushList(); flushQuote(); cards = []; continue; }
+    if (line.trim().toLowerCase().startsWith(':::cards')) { flushParagraph(); flushList(); flushQuote(); cards = []; cardMode = line.trim().split(/\s+/)[1]?.toLowerCase() || 'info'; continue; }
     if (cards) {
-      if (line.trim() === ':::') { output.push(renderCardRail(cards)); cards = null; }
+      if (line.trim() === ':::') { output.push(renderCardRail(cards, cardMode)); cards = null; cardMode = 'info'; }
       else if (line.trim()) cards.push(line.trim().replace(/^[-*]\s+/, ''));
       continue;
     }
@@ -131,7 +137,7 @@ function renderMarkdown(source) {
     }
     paragraph.push(line.trim());
   }
-  if (cards) output.push(renderCardRail(cards));
+  if (cards) output.push(renderCardRail(cards, cardMode));
   if (code) output.push(`<div class="code-card"><div class="code-card-head"><span>${escapeHtml(code.language || 'code')}</span></div><pre><code>${highlightCode(code.text, code.language)}</code></pre></div>`);
   flushParagraph(); flushList(); flushQuote();
   return output.join('') || '<p>No content returned.</p>';
@@ -238,11 +244,13 @@ $('#attachButton').addEventListener('click', () => $('#fileInput').click());
 $('#fileInput').addEventListener('change', async (event) => { for (const file of event.target.files) await uploadFile(file); event.target.value = ''; });
 attachmentPreview.addEventListener('click', (event) => { const documentIndex = event.target.closest('[data-remove-document]')?.dataset.removeDocument; const mediaIndex = event.target.closest('[data-remove-media]')?.dataset.removeMedia; if (documentIndex !== undefined) state.documents.splice(Number(documentIndex), 1); if (mediaIndex !== undefined) { const removed = state.media.splice(Number(mediaIndex), 1)[0]; if (removed?.url) URL.revokeObjectURL(removed.url); } renderAttachments(); });
 messages.addEventListener('click', async (event) => {
+  const suggestion = event.target.closest('[data-send-suggestion]');
   const copyCode = event.target.closest('[data-copy-code]');
   const verify = event.target.closest('[data-verify-code]');
   const copyAnswer = event.target.closest('[data-copy-answer]');
   const regenerate = event.target.closest('[data-regenerate]');
   if (copyCode) { await navigator.clipboard.writeText(window.__fireboxCode?.[copyCode.dataset.copyCode] || ''); showToast('Code copied.'); }
+  if (suggestion) void submit(suggestion.dataset.sendSuggestion || '');
   if (verify) await verifyCode(verify.dataset.verifyCode, verify);
   if (copyAnswer) { const content = copyAnswer.closest('.bubble')?.querySelector('.rich-content')?.innerText || ''; await navigator.clipboard.writeText(content); showToast('Answer copied.'); }
   const shareAnswer = event.target.closest('[data-share-answer]');
