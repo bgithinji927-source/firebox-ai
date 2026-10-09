@@ -92,3 +92,18 @@ body, :root { background: #000; }
     .conversation { height: calc(100dvh - 70px); }
   }
 }
+
+.generated-card-rail { margin: 18px 0 8px; }
+.generated-card-rail-label { margin-bottom: 8px; color: var(--accent); font-size: 10px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+.generated-card-scroller { display: flex; gap: 12px; overflow-x: auto; padding: 2px 2px 12px; scroll-snap-type: x mandatory; overscroll-behavior-x: contain; scrollbar-width: thin; scrollbar-color: #53636d transparent; }
+.generated-card-scroller::-webkit-scrollbar { height: 6px; }
+.generated-card-scroller::-webkit-scrollbar-thumb { border-radius: 999px; background: #53636d; }
+.generated-card { flex: 0 0 min(280px, 78vw); min-height: 150px; padding: 18px; scroll-snap-align: start; border: 1px solid #303b44; border-radius: 14px; background: linear-gradient(145deg, #171c21, #0d1013); }
+.generated-card:hover { border-color: #687b86; }
+.generated-card-icon { display: grid; place-items: center; width: 28px; height: 28px; margin-bottom: 22px; border-radius: 8px; background: rgba(185,244,107,.12); color: var(--accent); }
+.generated-card h3 { margin: 0; color: #fff; font-size: 16px; line-height: 1.25; }
+.generated-card p { margin: 8px 0 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
+@media (max-width: 600px) {
+  .generated-card-scroller { margin-right: -10px; padding-right: 22px; }
+  .generated-card { flex-basis: 78vw; min-height: 145px; }
+}

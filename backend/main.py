@@ -293,7 +293,9 @@ async def chat(payload: ChatRequest, x_owner_id: str | None = Header(default=Non
                 label = f"[S{index}] {source['title']}" + (f", page {source['page']}" if source.get("page") else "")
                 blocks.append(f"{label}\n{source['snippet']}")
             evidence = "\n\n".join(blocks)
-            context.insert(0, {"role": "system", "content": "Use the supplied evidence when relevant, but do not mention source labels, filenames, page numbers, or extracted snippets in the customer-facing answer. Do not claim facts not supported by the context.\n\nEvidence:\n" + evidence})
+            context.insert(0, {"role": "system", "content": "Use the supplied evidence when relevant, but do not mention source labels, filenames, page numbers, or extracted snippets in the customer-facing answer. Do not claim facts not supported by the context. When a workflow, architecture, comparison, or set of components would genuinely benefit from visual UI, you may emit a card rail using exactly this format:\n:::cards\nTitle | Short description\nAnother title | Short description\n:::\nUse 3 to 8 cards only when they improve understanding; do not use cards for ordinary answers.\n\nEvidence:\n" + evidence})
+        else:
+            context.insert(0, {"role": "system", "content": "When a workflow, architecture, comparison, or set of components would genuinely benefit from visual UI, you may emit a card rail using exactly this format:\n:::cards\nTitle | Short description\nAnother title | Short description\n:::\nUse 3 to 8 cards only when they improve understanding; do not use cards for ordinary answers."})
         answer = await model_adapter.chat(context, payload.model)
         if sources and answer_is_unusable(answer, prompt, sources):
             answer = extractive_answer(sources)
