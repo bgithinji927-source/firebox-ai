@@ -114,3 +114,8 @@ body, :root { background: #000; }
 .generated-card-send { margin-top: 18px; padding: 7px 10px; border: 1px solid #3d4d57; border-radius: 7px; background: #172128; color: var(--soft); font-size: 11px; cursor: pointer; }
 .generated-card-send:hover { border-color: var(--accent); color: var(--accent); }
 .generated-card.is-checklist:has(input:checked) { border-color: rgba(185,244,107,.55); opacity: .82; }
+
+.rich-content h4, .rich-content h5, .rich-content h6 { margin: 14px 0 7px; color: #eef3f5; line-height: 1.3; }
+.rich-content h4 { font-size: 15px; }
+.rich-content h5 { font-size: 14px; color: var(--soft); }
+.rich-content h6 { font-size: 13px; color: var(--muted); letter-spacing: .02em; }

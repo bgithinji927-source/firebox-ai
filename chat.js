@@ -124,10 +124,10 @@ function renderMarkdown(source) {
       output.push(`<div class="rich-table-wrap"><table class="rich-table"><thead><tr>${head.map((cell) => `<th>${inlineMarkdown(cell)}</th>`).join('')}</tr></thead><tbody>${rows.map((row) => `<tr>${head.map((_, cellIndex) => `<td>${inlineMarkdown(row[cellIndex] || '')}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`);
       continue;
     }
-    const heading = line.match(/^#{1,3}\s+(.+)/);
+    const heading = line.match(/^#{1,6}\s+(.+)/);
     const bullet = line.match(/^\s*[-*]\s+(?:\[[ xX]\]\s*)?(.+)/);
     const number = line.match(/^\s*\d+[.)]\s+(.+)/);
-    if (heading) { flushParagraph(); flushList(); const level = Math.min(3, line.match(/^#+/)[0].length); output.push(`<h${level}>${inlineMarkdown(heading[1])}</h${level}>`); continue; }
+    if (heading) { flushParagraph(); flushList(); const level = Math.min(6, line.match(/^#+/)[0].length); output.push(`<h${level}>${inlineMarkdown(heading[1])}</h${level}>`); continue; }
     if (bullet || number) { if (number && !ordered) { flushList(); ordered = true; } if (bullet && ordered) flushList(); list.push((bullet || number)[1]); continue; }
     if (!line.trim()) {
       flushParagraph();
