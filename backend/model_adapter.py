@@ -22,7 +22,18 @@ class FireboxModelAdapter:
         return self.runtime.status()
 
     async def chat(self, messages: list[dict[str, str]], model_name: str | None = None) -> str:
-        prompt = "\n".join(f"{item['role'].title()}: {item['content']}" for item in messages[-12:])
+        # Keep inference aligned with training/train_firebox.py's JSONL format.
+        # The model is small, so consistent prompt markers matter a lot.
+        parts: list[str] = []
+        for item in messages[-12:]:
+            role = item["role"]
+            if role == "system":
+                parts.append(f"Context: {item['content']}")
+            elif role == "user":
+                parts.append(f"Instruction: {item['content']}")
+            elif role == "assistant":
+                parts.append(f"Response: {item['content']}")
+        prompt = "\n".join(parts) + "\nResponse:"
         try:
             return self.runtime.generate(prompt)
         except LocalModelUnavailable as exc:
