@@ -43,7 +43,7 @@ function resizeInput() {
 }
 
 function inlineMarkdown(text) {
-  let html = escapeHtml(text);
+  let html = escapeHtml(text).replace(/\[(?:s|S)\d+\]\s*/g, '');
   html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
   html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
   html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
@@ -106,12 +106,12 @@ function generatedPanel(prompt, answer) {
 }
 function sourceCards(sources = []) {
   if (!sources.length) return '';
-  return `<section class="sources" aria-label="Sources">${sources.map((source, index) => {
-    const title = escapeHtml(source.title || `Source ${index + 1}`);
+  return `<details class="source-details"><summary>Show supporting sources <span>${sources.length}</span></summary><section class="sources" aria-label="Sources">${sources.map((source) => {
+    const title = escapeHtml(source.title || 'Supporting source');
     const detail = `${source.page ? `Page ${source.page}` : source.url ? 'Web source' : 'Uploaded knowledge'}${source.snippet ? ` · ${escapeHtml(source.snippet.slice(0, 130))}` : ''}`;
-    const content = `<strong>[S${index + 1}] ${title}</strong><small>${detail}</small>`;
+    const content = `<strong>${title}</strong><small>${detail}</small>`;
     return source.url ? `<a class="source-card" href="${escapeHtml(source.url)}" target="_blank" rel="noopener noreferrer">${content}</a>` : `<div class="source-card">${content}</div>`;
-  }).join('')}</section>`;
+  }).join('')}</section></details>`;
 }
 
 function addMessage(role, content, sources = [], prompt = '') {
