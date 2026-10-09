@@ -581,7 +581,13 @@ def api_index() -> dict[str, Any]:
     return {"name": "FIREBOX AI API", "version": app.version, "docs": "/docs"}
 
 
-PUBLIC_FILES = {"index.html", "styles.css", "app.js", "firebox-ai-icon.svg", "manus-routes.json"}
+@app.get("/chat", include_in_schema=False)
+def user_chat() -> FileResponse:
+    """Customer-facing chat page; the training dashboard remains at /."""
+    return FileResponse(ROOT / "chat.html")
+
+
+PUBLIC_FILES = {"index.html", "styles.css", "app.js", "chat.css", "chat.js", "firebox-ai-icon.svg", "manus-routes.json"}
 
 
 @app.get("/{path:path}")

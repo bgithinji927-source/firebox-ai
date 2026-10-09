@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>FIREBOX AI — Assistant</title>
+    <link rel="icon" href="/firebox-ai-icon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/chat.css" />
+  </head>
+  <body>
+    <main class="chat-app">
+      <header class="chat-header">
+        <a class="brand" href="/chat" aria-label="FIREBOX AI home">
+          <img src="/firebox-ai-icon.svg" alt="" />
+          <span><strong>FIREBOX AI</strong><small>Technical assistant</small></span>
+        </a>
+        <div class="header-actions">
+          <span class="status"><i></i> AI assistant</span>
+          <button id="newChat" type="button">New chat</button>
+        </div>
+      </header>
+
+      <section class="conversation" aria-label="FIREBOX AI conversation">
+        <div class="messages" id="messages" aria-live="polite">
+          <div class="welcome" id="welcome">
+            <div class="welcome-mark"><img src="/firebox-ai-icon.svg" alt="" /></div>
+            <h1>How can I help?</h1>
+            <p>Ask a technical question about programming, databases, cybersecurity, or your uploaded knowledge.</p>
+            <div class="suggestions">
+              <button type="button" data-prompt="What is SQL injection?">What is SQL injection?</button>
+              <button type="button" data-prompt="Explain databases in simple terms.">Explain databases simply</button>
+              <button type="button" data-prompt="How do I debug a Python error?">How do I debug Python?</button>
+            </div>
+          </div>
+        </div>
+        <div class="typing is-hidden" id="typing"><span></span><span></span><span></span><em>FIREBOX AI is thinking</em></div>
+        <form class="composer" id="composer">
+          <textarea id="message" rows="1" placeholder="Message FIREBOX AI..." aria-label="Message FIREBOX AI"></textarea>
+          <button id="send" type="submit" aria-label="Send message">↑</button>
+        </form>
+        <p class="disclaimer">FIREBOX AI can make mistakes. Check important technical and security advice.</p>
+      </section>
+    </main>
+    <script src="/chat.js" defer></script>
+  </body>
+</html>

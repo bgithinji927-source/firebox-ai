@@ -30,6 +30,8 @@ uvicorn backend.main:app --host 0.0.0.0 --port 3000
 
 Open `http://localhost:3000`. The browser will request the configured HTTP Basic credentials. Health status is available at `/api/health`; API docs at `/docs` are protected.
 
+The private training and administration dashboard is available at `/`. The clean customer-facing chatbot is available at `/chat`; it uses the same authenticated backend, document retrieval, and optional Groq teacher without exposing training controls.
+
 ## Required runtime configuration
 
 Keep secrets only in the backend environment; never put them in frontend code or commit a populated `.env` file.
@@ -94,6 +96,11 @@ For Railway, run training in a separate worker/job and save the checkpoint on th
 - `/api/learning/*` — feedback, lessons, approved knowledge, and training-run metadata
 - `POST /api/tools/verify` — safe local Python syntax, JSON, and arithmetic checks; never executes user code
 
+User interface routes:
+
+- `/` — private training and administration dashboard
+- `/chat` — customer-facing FIREBOX chatbot
+
 ## Tests
 
 ```bash
@@ -116,6 +123,8 @@ backend/firebox_model/   Tokenizer, model, runtime, and training utilities
 training/                 Local training entry point
 training_data/            Starter JSONL corpus and dataset guidance
 app.js                   Frontend interactions and API synchronization
+chat.html / chat.css     Customer-facing chatbot interface
+chat.js                  Customer-facing chatbot behavior
 index.html / styles.css  FIREBOX AI interface
 Dockerfile               Railway container runtime
 .env.example             Safe configuration template
