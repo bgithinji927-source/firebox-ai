@@ -207,6 +207,30 @@ def retrieve_chunks(repo: Repositories, owner: str, query: str, document_ids: li
     return results
 
 
+def answer_is_unusable(answer: str, query: str, sources: list[dict[str, Any]]) -> bool:
+    """Detect obvious tiny-model output failures before returning an answer."""
+    words = re.findall(r"[a-zA-Z0-9']+", answer.lower())
+    if len(words) < 8:
+        return True
+    if len(set(words)) / len(words) < 0.55:
+        return True
+    query_terms = set(re.findall(r"[a-zA-Z0-9']{3,}", query.lower()))
+    answer_terms = set(words)
+    source_terms = set(re.findall(r"[a-zA-Z0-9']{3,}", " ".join(str(item.get("snippet", "")) for item in sources).lower()))
+    if query_terms and not (query_terms & answer_terms) and not (answer_terms & source_terms):
+        return True
+    return any(marker in answer.lower() for marker in ("context:", "instruction:", "response:"))
+
+
+def extractive_answer(sources: list[dict[str, Any]]) -> str:
+    """Return retrieved evidence directly when the tiny model cannot explain it."""
+    source = sources[0]
+    label = f"[S1] {source['title']}"
+    if source.get("page"):
+        label += f", page {source['page']}"
+    return f"Based on the uploaded knowledge source ({label}):\n\n{source['snippet']}"
+
+
 async def search_web(query: str) -> list[dict[str, str]]:
     api_key = os.getenv("TAVILY_API_KEY", "").strip()
     if not api_key:
@@ -270,6 +294,8 @@ async def chat(payload: ChatRequest, x_owner_id: str | None = Header(default=Non
             evidence = "\n\n".join(blocks)
             context.insert(0, {"role": "system", "content": "Use the supplied evidence when relevant. Cite evidence inline with its [S#] label. Do not claim facts not supported by the context.\n\nEvidence:\n" + evidence})
         answer = await model_adapter.chat(context, payload.model)
+        if sources and answer_is_unusable(answer, prompt, sources):
+            answer = extractive_answer(sources)
     except ModelUnavailable as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     return {"answer": answer, "conversation_id": payload.conversation_id, "model": payload.model or model_adapter.model_name, "sources": sources}
