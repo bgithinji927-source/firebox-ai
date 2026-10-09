@@ -111,7 +111,7 @@ function setGenerating(isGenerating) {
   if (isGenerating) scrollToBottom();
 }
 
-function addMessage(role, content, sources = []) {
+function addMessage(role, content, sources = [], teacherReviewId = null) {
   const group = document.createElement('div');
   group.className = `message-group ${role === 'user' ? 'user-group' : 'assistant-group'}`;
   if (role === 'user') {
@@ -123,7 +123,7 @@ function addMessage(role, content, sources = []) {
         ? `<a class="citation" href="${escapeHtml(source.url)}" target="_blank" rel="noopener noreferrer">${label}</a>`
         : `<span class="citation">${label}</span>`;
     }).join('');
-    group.innerHTML = `<div class="message-meta"><span class="message-avatar"><img src="/firebox-ai-icon.svg" alt="" /></span><span>FIREBOX AI</span><span class="source-label">LOCAL CHECKPOINT</span></div><article class="message-card assistant-message"><p>${escapeHtml(content).replace(/\n/g, '<br>')}</p>${sourceLinks ? `<div class="response-divider"></div><div class="citation-row">${sourceLinks}</div>` : ''}<div class="feedback-row"><span>Teach FIREBOX</span><button type="button" data-feedback="good" data-response="${escapeHtml(content)}">Useful</button><button type="button" data-feedback="incorrect" data-response="${escapeHtml(content)}">Correct it</button></div></article>`;
+    group.innerHTML = `<div class="message-meta"><span class="message-avatar"><img src="/firebox-ai-icon.svg" alt="" /></span><span>FIREBOX AI</span><span class="source-label">${teacherReviewId ? 'GROQ REVIEWED' : 'LOCAL CHECKPOINT'}</span></div><article class="message-card assistant-message"><p>${escapeHtml(content).replace(/\n/g, '<br>')}</p>${sourceLinks ? `<div class="response-divider"></div><div class="citation-row">${sourceLinks}</div>` : ''}<div class="feedback-row"><span>Teach FIREBOX</span><button type="button" data-feedback="good" data-teacher-review="${escapeHtml(teacherReviewId || '')}" data-response="${escapeHtml(content)}">Useful</button><button type="button" data-feedback="incorrect" data-teacher-review="${escapeHtml(teacherReviewId || '')}" data-response="${escapeHtml(content)}">Correct it</button></div></article>`;
   }
   dom.dynamicMessages.appendChild(group);
   if (role === 'assistant') renderRecentSources(sources);
@@ -207,7 +207,7 @@ async function loadConversation(id) {
   dom.dynamicMessages.innerHTML = '';
   dom.quickPrompts.classList.toggle('is-hidden', conversation.messages.length > 0);
   for (const message of conversation.messages) {
-    if (message.role === 'user' || message.role === 'assistant') addMessage(message.role, message.content, message.metadata?.sources || []);
+    if (message.role === 'user' || message.role === 'assistant') addMessage(message.role, message.content, message.metadata?.sources || [], message.metadata?.teacher_review_id || null);
   }
   await refreshConversations();
 }
@@ -250,8 +250,8 @@ async function generateResponse(prompt, { persistUser = true } = {}) {
       method: 'POST', signal: state.abortController.signal,
       body: JSON.stringify({ message: prompt, model: dom.modelSelect.value || null, webSearch: state.webSearchEnabled, conversation_id: conversationId, document_ids: state.selectedDocuments.map((doc) => doc.id) }),
     });
-    addMessage('assistant', result.answer, result.sources || []);
-    try { await persistMessage(conversationId, 'assistant', result.answer, { sources: result.sources || [] }); }
+    addMessage('assistant', result.answer, result.sources || [], result.teacher_review_id || null);
+    try { await persistMessage(conversationId, 'assistant', result.answer, { sources: result.sources || [], teacher_review_id: result.teacher_review_id || null }); }
     catch (error) { showToast(`Answer generated, but it was not saved: ${error.message}`); }
     dom.regenerateButton.disabled = false;
     await refreshConversations();
@@ -470,6 +470,9 @@ function attachEvents() {
     if (feedbackButton) {
       try {
         await api('/learning/feedback', { method: 'POST', body: JSON.stringify({ prompt: state.lastUserPrompt || 'Conversation response', response: feedbackButton.dataset.response || '', rating: feedbackButton.dataset.feedback }) });
+        if (feedbackButton.dataset.feedback === 'good' && feedbackButton.dataset.teacherReview) {
+          await api(`/learning/teacher-reviews/${encodeURIComponent(feedbackButton.dataset.teacherReview)}/approve`, { method: 'POST' });
+        }
         showToast('Feedback saved for the next FIREBOX training run.');
         await refreshBrainLab();
       } catch (error) { showToast(`Feedback was not saved: ${error.message}`); }

@@ -52,6 +52,13 @@ Without MongoDB or a trained local checkpoint, the app reports degraded/unavaila
 
 The Groq teacher is optional. Add `GROQ_API_KEY` as a secret Railway variable to enable it. It receives the user question, the local FIREBOX draft, and retrieved document passages; it is instructed to cite only those passages and to say when evidence is insufficient. The key is never sent to the browser.
 
+When Groq returns a correction, it is saved as a **pending teacher review**. Clicking **Useful** approves that example; unapproved examples are never exported for training. Export approved examples and retrain locally with:
+
+```bash
+python training/export_teacher_dataset.py --output training_data/teacher_approved.jsonl
+python training/train_firebox.py --data training_data/teacher_approved.jsonl --checkpoint storage/checkpoints/latest.pt --epochs 8
+```
+
 ## Deploy to Railway
 
 1. Push this repository to GitHub and create a Railway project using **Deploy from GitHub repo**.
@@ -104,6 +111,7 @@ backend/main.py          FastAPI routes, auth gate, uploads, retrieval, search
 backend/db.py            MongoDB connection and indexes
 backend/repositories.py  Persistence operations
 backend/model_adapter.py Local FIREBOX checkpoint adapter
+backend/teacher_supervisor.py Optional Groq answer reviewer
 backend/firebox_model/   Tokenizer, model, runtime, and training utilities
 training/                 Local training entry point
 training_data/            Starter JSONL corpus and dataset guidance

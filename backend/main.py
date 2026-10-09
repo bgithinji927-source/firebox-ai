@@ -284,6 +284,8 @@ async def chat(payload: ChatRequest, x_owner_id: str | None = Header(default=Non
         context = [{"role": "user", "content": prompt}]
 
     sources: list[dict[str, Any]] = []
+    evidence = ""
+    teacher_review_id: str | None = None
     try:
         sources.extend(retrieve_chunks(repo, owner, prompt, payload.document_ids))
         if payload.webSearch:
@@ -301,10 +303,21 @@ async def chat(payload: ChatRequest, x_owner_id: str | None = Header(default=Non
         if teacher.configured:
             supervised = await teacher.review(prompt, answer, sources)
             if supervised:
+                draft = answer
                 answer = supervised
+                review = repo.insert_training_record("teacher_reviews", owner, {
+                    "prompt": prompt,
+                    "context": evidence,
+                    "draft": draft,
+                    "response": supervised,
+                    "sources": sources,
+                    "approved": False,
+                    "teacher_model": teacher.model,
+                })
+                teacher_review_id = review.get("id")
     except ModelUnavailable as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
-    return {"answer": answer, "conversation_id": payload.conversation_id, "model": payload.model or model_adapter.model_name, "sources": sources}
+    return {"answer": answer, "conversation_id": payload.conversation_id, "model": payload.model or model_adapter.model_name, "sources": sources, "teacher_used": teacher_review_id is not None, "teacher_review_id": teacher_review_id}
 
 
 @app.get("/api/conversations")
@@ -459,6 +472,25 @@ def learning_status() -> dict[str, Any]:
 @app.get("/api/learning/feedback")
 def list_feedback(x_owner_id: str | None = Header(default=None)) -> dict[str, Any]:
     return {"items": require_database().list_training_records("training_feedback", owner_id(x_owner_id))}
+
+
+@app.get("/api/learning/teacher-reviews")
+def list_teacher_reviews(x_owner_id: str | None = Header(default=None)) -> dict[str, Any]:
+    return {"items": require_database().list_teacher_reviews(owner_id(x_owner_id))}
+
+
+@app.post("/api/learning/teacher-reviews/{review_id}/approve")
+def approve_teacher_review(review_id: str, x_owner_id: str | None = Header(default=None)) -> dict[str, Any]:
+    if not require_database().approve_teacher_review(owner_id(x_owner_id), review_id):
+        raise HTTPException(status_code=404, detail="Teacher review not found")
+    return {"approved": True, "id": review_id}
+
+
+@app.get("/api/learning/teacher-dataset")
+def teacher_dataset(x_owner_id: str | None = Header(default=None)) -> dict[str, Any]:
+    """Return only owner-approved examples in train_firebox.py JSONL shape."""
+    items = require_database().approved_teacher_dataset(owner_id(x_owner_id))
+    return {"items": items, "count": len(items)}
 
 
 @app.post("/api/learning/feedback", status_code=201)

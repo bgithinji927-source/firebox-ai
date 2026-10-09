@@ -147,6 +147,30 @@ class Repositories:
     def add_knowledge_item(self, owner_id: str, values: dict[str, Any]) -> dict[str, Any]:
         return self.insert_training_record("knowledge_items", owner_id, {"approved": False, **values})
 
+    def list_teacher_reviews(self, owner_id: str, limit: int = 100) -> list[dict[str, Any]]:
+        return self.list_training_records("teacher_reviews", owner_id, limit)
+
+    def approve_teacher_review(self, owner_id: str, review_id: str) -> bool:
+        if not ObjectId.is_valid(review_id):
+            return False
+        result = self.store.collection("teacher_reviews").update_one(
+            {"_id": ObjectId(review_id), "owner_id": owner_id},
+            {"$set": {"approved": True, "approved_at": utc_now()}},
+        )
+        return result.modified_count == 1
+
+    def approved_teacher_dataset(self, owner_id: str, limit: int = 5000) -> list[dict[str, Any]]:
+        items = self.store.collection("teacher_reviews").find({"owner_id": owner_id, "approved": True}).sort("created_at", 1).limit(limit)
+        return [
+            {
+                "instruction": item.get("prompt", ""),
+                "context": item.get("context", ""),
+                "response": item.get("response", ""),
+            }
+            for item in items
+            if item.get("prompt") and item.get("response")
+        ]
+
     def approve_knowledge_item(self, owner_id: str, item_id: str) -> bool:
         if not ObjectId.is_valid(item_id):
             return False
