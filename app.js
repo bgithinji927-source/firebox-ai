@@ -47,6 +47,13 @@ function cacheDom() {
   dom.memoryDetail = document.querySelector('#memoryDetail');
   dom.modelStatus = document.querySelector('#modelStatus');
   dom.modelDetail = document.querySelector('#modelDetail');
+  dom.brainPulse = document.querySelector('#brainPulse');
+  dom.brainStatus = document.querySelector('#brainStatus');
+  dom.brainDetail = document.querySelector('#brainDetail');
+  dom.lessonCount = document.querySelector('#lessonCount');
+  dom.feedbackCount = document.querySelector('#feedbackCount');
+  dom.knowledgeCount = document.querySelector('#knowledgeCount');
+  dom.trainingGuideButton = document.querySelector('#trainingGuideButton');
   dom.toast = document.querySelector('#toast');
 }
 
@@ -113,7 +120,7 @@ function addMessage(role, content, sources = []) {
         ? `<a class="citation" href="${escapeHtml(source.url)}" target="_blank" rel="noopener noreferrer">${label}</a>`
         : `<span class="citation">${label}</span>`;
     }).join('');
-    group.innerHTML = `<div class="message-meta"><span class="message-avatar"><img src="/firebox-ai-icon.svg" alt="" /></span><span>FIREBOX AI</span><span class="source-label">LIVE MODEL</span></div><article class="message-card assistant-message"><p>${escapeHtml(content).replace(/\n/g, '<br>')}</p>${sourceLinks ? `<div class="response-divider"></div><div class="citation-row">${sourceLinks}</div>` : ''}</article>`;
+    group.innerHTML = `<div class="message-meta"><span class="message-avatar"><img src="/firebox-ai-icon.svg" alt="" /></span><span>FIREBOX AI</span><span class="source-label">LOCAL CHECKPOINT</span></div><article class="message-card assistant-message"><p>${escapeHtml(content).replace(/\n/g, '<br>')}</p>${sourceLinks ? `<div class="response-divider"></div><div class="citation-row">${sourceLinks}</div>` : ''}<div class="feedback-row"><span>Teach FIREBOX</span><button type="button" data-feedback="good" data-response="${escapeHtml(content)}">Useful</button><button type="button" data-feedback="incorrect" data-response="${escapeHtml(content)}">Correct it</button></div></article>`;
   }
   dom.dynamicMessages.appendChild(group);
   if (role === 'assistant') renderRecentSources(sources);
@@ -341,6 +348,7 @@ async function syncBackendStatus() {
       await api('/documents').then(({ items = [] }) => { state.allDocuments = items; });
       dom.documentCount.textContent = String(state.allDocuments.length);
       await loadSettings();
+      await refreshBrainLab();
     } else {
       statusStrong.textContent = 'Storage unavailable';
       statusSmall.textContent = health.mongodb?.error || 'Messages cannot be saved';
@@ -356,6 +364,25 @@ async function syncBackendStatus() {
     dom.modelDetail.textContent = 'Backend health check failed';
     statusStrong.textContent = error.status === 401 ? 'Authentication required' : 'Backend unavailable';
     statusSmall.textContent = error.message || 'No data was saved';
+  }
+}
+
+async function refreshBrainLab() {
+  try {
+    const [learning, lessons, feedback, knowledge] = await Promise.all([
+      api('/learning/status'), api('/learning/lessons'), api('/learning/feedback'), api('/learning/knowledge'),
+    ]);
+    const model = learning.model || {};
+    const ready = Boolean(model.configured);
+    dom.brainPulse.classList.toggle('is-ready', ready);
+    dom.brainStatus.textContent = ready ? 'Checkpoint active' : 'Checkpoint not loaded';
+    dom.brainDetail.textContent = ready ? `Epoch ${model.epoch || 0} · loss ${model.validation_loss ?? 'n/a'}` : (model.error || 'Train the local model to activate the brain.');
+    dom.lessonCount.textContent = String((lessons.items || []).length);
+    dom.feedbackCount.textContent = String((feedback.items || []).length);
+    dom.knowledgeCount.textContent = String((knowledge.items || []).filter((item) => item.approved).length);
+  } catch (error) {
+    dom.brainStatus.textContent = 'Learning data unavailable';
+    dom.brainDetail.textContent = error.message || 'Connect MongoDB to view learning state.';
   }
 }
 
@@ -389,6 +416,7 @@ function attachEvents() {
   });
   dom.composer.addEventListener('submit', (event) => { event.preventDefault(); void submitPrompt(dom.messageInput.value); });
   dom.stopButton.addEventListener('click', () => state.abortController?.abort());
+  dom.trainingGuideButton.addEventListener('click', () => showToast('Train locally: python training/train_firebox.py --data training_data/starter.jsonl --checkpoint storage/checkpoints/latest.pt --epochs 8'));
   dom.regenerateButton.addEventListener('click', () => {
     if (state.lastUserPrompt && !state.isGenerating) void generateResponse(state.lastUserPrompt, { persistUser: false });
   });
@@ -403,6 +431,15 @@ function attachEvents() {
     if (button?.dataset.conversationId) void loadConversation(button.dataset.conversationId).catch((error) => showToast(`Conversation could not be loaded: ${error.message}`));
   });
   dom.dynamicMessages.addEventListener('click', async (event) => {
+    const feedbackButton = event.target.closest('[data-feedback]');
+    if (feedbackButton) {
+      try {
+        await api('/learning/feedback', { method: 'POST', body: JSON.stringify({ prompt: state.lastUserPrompt || 'Conversation response', response: feedbackButton.dataset.response || '', rating: feedbackButton.dataset.feedback }) });
+        showToast('Feedback saved for the next FIREBOX training run.');
+        await refreshBrainLab();
+      } catch (error) { showToast(`Feedback was not saved: ${error.message}`); }
+      return;
+    }
     const copyButton = event.target.closest('[data-copy]');
     if (!copyButton) return;
     try { await navigator.clipboard.writeText(copyButton.dataset.copy); showToast('Copied.'); }

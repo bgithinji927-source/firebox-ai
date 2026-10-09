@@ -36,9 +36,10 @@
             <span>Knowledge library</span>
             <span class="nav-count" id="documentCount">0</span>
           </a>
-          <a class="nav-item" href="#chat" data-toast="A separate activity feed is not implemented.">
-            <span class="nav-icon" aria-hidden="true">◷</span>
-            <span>Activity</span>
+          <a class="nav-item" href="#brainLab">
+            <span class="nav-icon" aria-hidden="true">⌬</span>
+            <span>Brain Lab</span>
+            <span class="nav-count">LOCAL</span>
           </a>
         </nav>
 
@@ -173,6 +174,16 @@
               <div class="source-layer"><span class="layer-symbol">W</span><div><strong>Web research</strong><small>Requires a configured search key</small></div><span class="layer-state is-off"></span></div>
             </section>
 
+            <section class="utility-card brain-card" id="brainLab">
+              <div class="utility-card-heading"><span class="eyebrow">FIREBOX BRAIN / LAB</span><span class="brain-badge">LOCAL</span></div>
+              <div class="brain-state"><span class="brain-pulse" id="brainPulse"></span><div><strong id="brainStatus">Checkpoint not loaded</strong><small id="brainDetail">Train the local model to activate the brain.</small></div></div>
+              <div class="brain-stats">
+                <div><strong id="lessonCount">0</strong><small>lessons</small></div>
+                <div><strong id="feedbackCount">0</strong><small>feedback</small></div>
+                <div><strong id="knowledgeCount">0</strong><small>facts</small></div>
+              </div>
+              <button class="lab-button" id="trainingGuideButton" type="button">Open training guide <span>↗</span></button>
+            </section>
             <section class="utility-card recent-card">
               <div class="utility-card-heading"><span class="eyebrow">RECENT SOURCES</span><span class="source-count" id="sourceCount">0</span></div>
               <div id="recentSources" class="empty-source"><span class="empty-source-mark">⌁</span><strong>No sources yet</strong><small>Sources from completed answers appear here.</small></div>
