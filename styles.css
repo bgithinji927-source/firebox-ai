@@ -429,3 +429,35 @@ html, body { height: 100%; overflow: hidden; }
   .chat-panel { min-height: calc(100vh - 120px); overflow: visible; }
   .utility-rail { max-height: none; overflow: visible; }
 }
+
+/* High-readability dashboard scale. */
+.nav-item { font-size: 17px; padding-top: 12px; padding-bottom: 12px; }
+.nav-icon { font-size: 20px; }
+.nav-count { font-size: 11px; }
+.sidebar-section-heading { font-size: 11px; }
+.conversation-item strong { font-size: 16px; }
+.conversation-item small { font-size: 11px; }
+.workspace-context h1 { font-size: 23px; }
+.model-control select, .search-toggle { font-size: 15px; }
+.conversation-header h2 { font-size: 29px; }
+.ghost-button { font-size: 14px; }
+.message-card p { font-size: 18px; line-height: 1.75; }
+.message-meta { font-size: 12px; }
+.prompt-card strong { font-size: 16px; }
+.prompt-card span:last-child { font-size: 15px; }
+.composer-input-wrap textarea { font-size: 17px; }
+.attach-button, .composer-mode, .send-button, .stop-button { font-size: 15px; }
+.status-line strong, .source-layer strong { font-size: 15px; }
+.status-line small, .source-layer small, .empty-source small, .utility-tip p { font-size: 13px; }
+.live-chip, .source-count { font-size: 11px; }
+.brain-state strong { font-size: 16px; }
+.brain-state small, .brain-stats small { font-size: 13px; }
+.brain-stats strong { font-size: 17px; }
+.lab-button { font-size: 14px; }
+.citation, .feedback-row, .feedback-row button { font-size: 13px; }
+.utility-rail { scroll-padding-top: 18px; }
+.utility-card:target { outline: 2px solid var(--ink); outline-offset: 3px; }
+
+@media (prefers-color-scheme: dark) {
+  .utility-card:target { outline-color: #f5f5f5; }
+}
