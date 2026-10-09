@@ -67,3 +67,9 @@ body, :root { background: #000; }
 .icon-button svg, .icon-action svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .icon-action { width: 30px; height: 28px; padding: 5px; border: 0; background: transparent; color: #93a0aa; }
 .icon-action:hover { border: 0; background: #171b20; color: #fff; }
+
+.rich-content blockquote { margin: 14px 0; padding: 10px 14px; border-left: 3px solid var(--accent); background: #101510; color: #d6e4d0; }
+.syntax-keyword { color: #c792ea; }
+.syntax-string { color: #c3e88d; }
+.syntax-comment { color: #71808a; font-style: italic; }
+.syntax-number { color: #f78c6c; }

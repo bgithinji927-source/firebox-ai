@@ -50,6 +50,15 @@ function inlineMarkdown(text) {
   return html;
 }
 
+function highlightCode(code, language = '') {
+  let html = escapeHtml(code);
+  html = html.replace(/\b(const|let|var|function|return|if|else|for|while|class|new|import|from|export|async|await|def|in|True|False|None|try|except|with|as|SELECT|FROM|WHERE|JOIN|INSERT|INTO|UPDATE|DELETE)\b/g, '<span class="syntax-keyword">$1</span>');
+  html = html.replace(/(&quot;[^&\n]*?&quot;|&#039;[^'\n]*?&#039;|`[^`\n]*?`)/g, '<span class="syntax-string">$1</span>');
+  html = html.replace(/(\/\/[^\n]*|#[^\n]*|--[^\n]*)/g, '<span class="syntax-comment">$1</span>');
+  html = html.replace(/\b(\d+(?:\.\d+)?)\b/g, '<span class="syntax-number">$1</span>');
+  return html;
+}
+
 function renderMarkdown(source) {
   const lines = String(source || '').replace(/\r/g, '').split('\n');
   const output = [];
@@ -57,8 +66,10 @@ function renderMarkdown(source) {
   let list = [];
   let ordered = false;
   let code = null;
+  let quote = [];
   const flushParagraph = () => { if (paragraph.length) { output.push(`<p>${inlineMarkdown(paragraph.join(' '))}</p>`); paragraph = []; } };
   const flushList = () => { if (!list.length) return; const tag = ordered ? 'ol' : 'ul'; output.push(`<${tag}>${list.map((item) => `<li>${inlineMarkdown(item)}</li>`).join('')}</${tag}>`); list = []; ordered = false; };
+  const flushQuote = () => { if (quote.length) { output.push(`<blockquote>${quote.map((item) => inlineMarkdown(item)).join('<br>')}</blockquote>`); quote = []; } };
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index];
     if (line.trim().startsWith('```')) {
@@ -66,7 +77,7 @@ function renderMarkdown(source) {
         const id = `code-${Math.random().toString(36).slice(2)}`;
         window.__fireboxCode = window.__fireboxCode || {};
         window.__fireboxCode[id] = code.text;
-        output.push(`<div class="code-card"><div class="code-card-head"><span>${escapeHtml(code.language || 'code')}</span><span><button type="button" data-copy-code="${id}">Copy</button> <button type="button" data-verify-code="${id}">Verify</button></span></div><pre><code>${escapeHtml(code.text)}</code></pre></div>`);
+        output.push(`<div class="code-card"><div class="code-card-head"><span>${escapeHtml(code.language || 'code')}</span><span><button type="button" data-copy-code="${id}">Copy</button> <button type="button" data-verify-code="${id}">Verify</button></span></div><pre><code>${highlightCode(code.text, code.language)}</code></pre></div>`);
         code = null;
       } else {
         flushParagraph(); flushList(); code = { language: line.trim().slice(3).trim(), text: '' };
@@ -74,6 +85,9 @@ function renderMarkdown(source) {
       continue;
     }
     if (code) { code.text += `${line}${index < lines.length - 1 ? '\n' : ''}`; continue; }
+    const quoteLine = line.match(/^\s*>\s?(.*)$/);
+    if (quoteLine) { flushParagraph(); flushList(); quote.push(quoteLine[1]); continue; }
+    if (quote.length) flushQuote();
     const tableNext = lines[index + 1] || '';
     if (/^\s*\|/.test(line) && /^\s*\|?\s*:?-{3,}/.test(tableNext)) {
       flushParagraph(); flushList();
@@ -92,8 +106,8 @@ function renderMarkdown(source) {
     if (!line.trim()) { flushParagraph(); flushList(); continue; }
     paragraph.push(line.trim());
   }
-  if (code) output.push(`<div class="code-card"><div class="code-card-head"><span>${escapeHtml(code.language || 'code')}</span></div><pre><code>${escapeHtml(code.text)}</code></pre></div>`);
-  flushParagraph(); flushList();
+  if (code) output.push(`<div class="code-card"><div class="code-card-head"><span>${escapeHtml(code.language || 'code')}</span></div><pre><code>${highlightCode(code.text, code.language)}</code></pre></div>`);
+  flushParagraph(); flushList(); flushQuote();
   return output.join('') || '<p>No content returned.</p>';
 }
 
