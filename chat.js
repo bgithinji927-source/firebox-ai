@@ -105,13 +105,7 @@ function generatedPanel(prompt, answer) {
   return `<section class="generated-panel"><div class="generated-label">Interactive checklist · generated from this answer</div>${items.map((item) => `<label class="generated-check"><input type="checkbox" /> <span>${inlineMarkdown(item)}</span></label>`).join('')}</section>`;
 }
 function sourceCards(sources = []) {
-  if (!sources.length) return '';
-  return `<details class="source-details"><summary>Show supporting sources <span>${sources.length}</span></summary><section class="sources" aria-label="Sources">${sources.map((source) => {
-    const title = escapeHtml(source.title || 'Supporting source');
-    const detail = `${source.page ? `Page ${source.page}` : source.url ? 'Web source' : 'Uploaded knowledge'}${source.snippet ? ` · ${escapeHtml(source.snippet.slice(0, 130))}` : ''}`;
-    const content = `<strong>${title}</strong><small>${detail}</small>`;
-    return source.url ? `<a class="source-card" href="${escapeHtml(source.url)}" target="_blank" rel="noopener noreferrer">${content}</a>` : `<div class="source-card">${content}</div>`;
-  }).join('')}</section></details>`;
+  return '';
 }
 
 function addMessage(role, content, sources = [], prompt = '') {
