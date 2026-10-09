@@ -2,16 +2,19 @@
 
 ## Product scope
 
-Create a responsive, browser-based FIREBOX AI dashboard shell that feels like a real assistant product and is ready to connect to a model, document retrieval service, and web-search backend. This first project is intentionally frontend-first: it provides meaningful client-side interactions and clearly marks the preview-mode boundary instead of pretending a backend is connected.
+Create a responsive, browser-based FIREBOX AI application with a ChatGPT-style dark dashboard, a Python/FastAPI backend, and MongoDB as the primary application database. The frontend remains usable while model services are offline, but backend storage and health reporting are real and never claim success when a save fails.
 
 ## Implementation approach
 
 - Use semantic HTML, plain CSS, and vanilla JavaScript so a beginner can read and maintain the project without a build framework.
+- Use FastAPI and Pydantic for the API, PyMongo for MongoDB access, and a small Ollama-compatible model adapter for live local inference.
+- Keep MongoDB collections and persistence operations in `backend/repositories.py`; keep connection and index management in `backend/db.py`.
+- Store original uploads in configured file storage and keep document metadata, checksums, processing status, and future chunk metadata in MongoDB.
 - Keep the app as a static web project served on port 3000.
 - Put the reusable brand icon in `public/firebox-ai-icon.svg`.
 - Keep the route manifest at `public/manus-routes.json`.
 - Use `app.js` for UI state: conversation switching, composing/sending messages, preview responses, file-chip handling, model/search controls, copy buttons, regenerate, stop generation, and mobile sidebar behavior.
-- Preserve future integration seams with a single `API_BASE_URL` constant and an optional `/api/chat` request path; when unavailable, the UI explicitly stays in preview mode.
+- Preserve future integration seams with a single `API_BASE_URL` constant and explicit `/api/chat`, conversation, settings, and document endpoints; when MongoDB or the model is unavailable, the API returns an honest error and the UI reports that state.
 
 ## Design direction
 

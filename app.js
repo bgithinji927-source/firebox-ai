@@ -4,6 +4,8 @@ const STORAGE_KEY = 'firebox-ai-dashboard-state';
 const state = {
   isGenerating: false,
   activeConversation: 'API authentication patterns',
+  backendConversationId: null,
+  backendReady: false,
   lastUserPrompt: '',
   timeoutId: null,
   attachedFiles: [],
@@ -82,6 +84,7 @@ function addUserMessage(prompt) {
     <article class="message-card user-message"><p>${escapeHtml(prompt)}</p></article>
   `;
   dom.dynamicMessages.appendChild(message);
+  void persistBackendMessage('user', prompt);
   scrollToBottom();
 }
 
@@ -123,6 +126,7 @@ function addAssistantMessage(prompt) {
     <article class="message-card assistant-message">${responseMarkup(prompt)}<div class="response-divider"></div><div class="message-note"><span class="note-mark">i</span> Preview mode · No live model request was made.</div></article>
   `;
   dom.dynamicMessages.appendChild(message);
+  void persistBackendMessage('assistant', message.querySelector('.assistant-message')?.innerText || '');
   dom.regenerateButton.disabled = false;
   scrollToBottom();
 }
@@ -132,13 +136,14 @@ function scrollToBottom() {
 }
 
 async function tryLiveRequest(prompt) {
-  // The dashboard stays honest when no backend exists. A future API can opt in here.
+  // The dashboard calls the real backend when persistence is available.
   if (!API_BASE_URL) return null;
   try {
+    if (state.backendReady && !state.backendConversationId) await ensureBackendConversation();
     const response = await fetch(`${API_BASE_URL}/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: prompt, model: dom.modelSelect.value, webSearch: dom.searchToggle.getAttribute('aria-pressed') === 'true' }),
+      body: JSON.stringify({ message: prompt, model: dom.modelSelect.value, webSearch: dom.searchToggle.getAttribute('aria-pressed') === 'true', conversation_id: state.backendConversationId }),
     });
     if (!response.ok) return null;
     return await response.json();
@@ -165,6 +170,7 @@ async function generateResponse(prompt) {
     message.className = 'message-group assistant-group';
     message.innerHTML = `<div class="message-meta"><span class="message-avatar"><img src="/firebox-ai-icon.svg" alt="" /></span><span>FIREBOX AI</span><span class="message-time">now</span><span class="source-label">LIVE MODEL</span></div><article class="message-card assistant-message"><p>${escapeHtml(liveResult.answer)}</p></article>`;
     dom.dynamicMessages.appendChild(message);
+    void persistBackendMessage('assistant', liveResult.answer);
     dom.regenerateButton.disabled = false;
     setGenerating(false);
     return;
@@ -209,6 +215,7 @@ function setConversation(button) {
   document.querySelectorAll('.conversation-item').forEach((item) => item.classList.remove('is-active'));
   button.classList.add('is-active');
   state.activeConversation = button.dataset.conversation;
+  state.backendConversationId = button.dataset.conversationId || null;
   dom.conversationTitle.textContent = state.activeConversation;
   persistState();
   setSidebar(false);
@@ -218,6 +225,7 @@ function setConversation(button) {
 function createNewChat() {
   document.querySelectorAll('.conversation-item').forEach((item) => item.classList.remove('is-active'));
   state.activeConversation = 'New technical session';
+  state.backendConversationId = null;
   dom.conversationTitle.textContent = state.activeConversation;
   dom.dynamicMessages.innerHTML = '';
   dom.quickPrompts.classList.remove('is-hidden');
@@ -257,10 +265,12 @@ function attachEvents() {
     if (state.lastUserPrompt && !state.isGenerating) generateResponse(state.lastUserPrompt);
   });
   dom.fileInput.addEventListener('change', (event) => {
-    state.attachedFiles.push(...Array.from(event.target.files));
+    const selectedFiles = Array.from(event.target.files);
+    state.attachedFiles.push(...selectedFiles);
     renderAttachments();
     event.target.value = '';
     if (state.attachedFiles.length) showToast(`${state.attachedFiles.length} file${state.attachedFiles.length === 1 ? '' : 's'} attached for the next request.`);
+    if (state.backendReady) selectedFiles.forEach((file) => { void uploadDocumentMetadata(file); });
   });
   dom.conversationList.addEventListener('click', (event) => {
     const button = event.target.closest('.conversation-item');
@@ -296,11 +306,98 @@ function attachEvents() {
   });
 }
 
+async function syncBackendStatus() {
+  const statusStrong = document.querySelector('.preview-status strong');
+  const statusSmall = document.querySelector('.preview-status small');
+  try {
+    const response = await fetch(`${API_BASE_URL}/health`, { headers: { Accept: 'application/json' } });
+    if (!response.ok) throw new Error(`Health request failed: ${response.status}`);
+    const health = await response.json();
+    state.backendReady = Boolean(health.mongodb?.connected);
+    if (state.backendReady) {
+      statusStrong.textContent = 'MongoDB connected';
+      statusSmall.textContent = 'Persistence enabled';
+      await loadBackendConversations();
+    } else {
+      statusStrong.textContent = 'Storage unavailable';
+      statusSmall.textContent = 'No data was saved';
+    }
+  } catch {
+    state.backendReady = false;
+    statusStrong.textContent = 'Backend unavailable';
+    statusSmall.textContent = 'No data was saved';
+  }
+}
+
+async function loadBackendConversations() {
+  const response = await fetch(`${API_BASE_URL}/conversations`, { headers: { Accept: 'application/json' } });
+  if (!response.ok) return;
+  const payload = await response.json();
+  if (!Array.isArray(payload.items) || payload.items.length === 0) return;
+  dom.conversationList.innerHTML = payload.items.slice(0, 8).map((conversation, index) => `
+    <button class="conversation-item ${index === 0 ? 'is-active' : ''}" type="button" data-conversation="${escapeHtml(conversation.title)}" data-conversation-id="${escapeHtml(conversation.id)}">
+      <span class="conversation-dot"></span>
+      <span class="conversation-item-copy"><strong>${escapeHtml(conversation.title)}</strong><small>${new Date(conversation.updated_at).toLocaleDateString()}</small></span>
+    </button>
+  `).join('');
+  if (!state.backendConversationId) {
+    state.backendConversationId = payload.items[0].id;
+    state.activeConversation = payload.items[0].title;
+    dom.conversationTitle.textContent = state.activeConversation;
+  }
+}
+
+async function ensureBackendConversation() {
+  if (state.backendConversationId) return state.backendConversationId;
+  const response = await fetch(`${API_BASE_URL}/conversations`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ title: state.activeConversation }),
+  });
+  if (!response.ok) throw new Error('Conversation could not be created');
+  const conversation = await response.json();
+  state.backendConversationId = conversation.id;
+  return state.backendConversationId;
+}
+
+async function persistBackendMessage(role, content) {
+  if (!state.backendReady || !content.trim()) return;
+  try {
+    const conversationId = await ensureBackendConversation();
+    const response = await fetch(`${API_BASE_URL}/conversations/${encodeURIComponent(conversationId)}/messages`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ role, content, metadata: { source: role === 'user' ? 'composer' : 'assistant' } }),
+    });
+    if (!response.ok) throw new Error('Message was not saved');
+  } catch {
+    state.backendReady = false;
+    const statusStrong = document.querySelector('.preview-status strong');
+    const statusSmall = document.querySelector('.preview-status small');
+    statusStrong.textContent = 'Save failed';
+    statusSmall.textContent = 'The message was not saved';
+    showToast('MongoDB save failed. The message was not saved.');
+  }
+}
+
+async function uploadDocumentMetadata(file) {
+  const formData = new FormData();
+  formData.append('file', file);
+  try {
+    const response = await fetch(`${API_BASE_URL}/documents/upload`, { method: 'POST', body: formData });
+    if (!response.ok) throw new Error('Document upload failed');
+    showToast(`${file.name} uploaded. Processing status: pending.`);
+  } catch {
+    showToast(`${file.name} was not saved to MongoDB.`);
+  }
+}
+
 function init() {
   cacheDom();
   restoreState();
   attachEvents();
   autoResize();
+  void syncBackendStatus();
 }
 
 document.addEventListener('DOMContentLoaded', init);
